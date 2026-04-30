@@ -1,0 +1,2738 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Summit NSF 2026 — Gestão de Participantes</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<style>
+:root {
+  --bg: #0f172a; --bg2: #1e293b; --bg3: #334155;
+  --text: #e2e8f0; --text2: #94a3b8; --text3: #64748b;
+  --accent: #6366f1; --accent2: #818cf8;
+  --green: #22c55e; --yellow: #eab308; --red: #ef4444; --purple: #a855f7;
+  --border: #334155;
+  --radius: 8px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); }
+
+/* LOGIN */
+.login-overlay { position:fixed; inset:0; background:var(--bg); display:flex; align-items:center; justify-content:center; z-index:9999; }
+.login-box { background:var(--bg2); border:1px solid var(--border); border-radius:16px; padding:48px 40px; width:380px; text-align:center; }
+.login-box h1 { font-size:24px; margin-bottom:8px; background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.login-box p { color:var(--text2); font-size:13px; margin-bottom:32px; }
+.login-box input { width:100%; padding:12px 16px; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); color:var(--text); font-size:15px; outline:none; margin-bottom:16px; text-align:center; letter-spacing:2px; }
+.login-box input:focus { border-color:var(--accent); }
+.login-box button { width:100%; padding:12px; background:var(--accent); color:#fff; border:none; border-radius:var(--radius); font-size:15px; font-weight:600; cursor:pointer; }
+.login-box button:hover { background:var(--accent2); }
+.login-error { color:var(--red); font-size:13px; margin-top:8px; display:none; }
+
+/* LAYOUT */
+.app { display:none; }
+.topbar { background:var(--bg2); border-bottom:1px solid var(--border); padding:12px 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; }
+.topbar h1 { font-size:18px; font-weight:700; }
+.topbar h1 span { color:var(--accent2); }
+.topbar-actions { display:flex; gap:8px; align-items:center; }
+.topbar-actions button, .topbar-actions label { padding:8px 16px; background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius); color:var(--text); font-size:13px; cursor:pointer; display:flex; align-items:center; gap:6px; }
+.topbar-actions button:hover, .topbar-actions label:hover { border-color:var(--accent); }
+.topbar-actions input[type=file] { display:none; }
+
+/* TABS */
+.tabs { display:flex; background:var(--bg2); border-bottom:1px solid var(--border); padding:0 24px; gap:0; }
+.tab { padding:12px 24px; font-size:14px; font-weight:500; color:var(--text2); cursor:pointer; border-bottom:2px solid transparent; transition:all .2s; }
+.tab:hover { color:var(--text); }
+.tab.active { color:var(--accent2); border-bottom-color:var(--accent); }
+
+/* CONTENT */
+.content { padding:24px; }
+.panel { display:none; }
+.panel.active { display:block; }
+
+/* DASHBOARD */
+.dash-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px; }
+.dash-card { background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:20px; position:relative; overflow:hidden; }
+.dash-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; }
+.dash-card.purple::before { background:var(--accent); }
+.dash-card.green::before { background:var(--green); }
+.dash-card.yellow::before { background:var(--yellow); }
+.dash-card.red::before { background:var(--red); }
+.dash-card .number { font-size:36px; font-weight:800; line-height:1.1; }
+.dash-card.purple .number { color:var(--accent2); }
+.dash-card.green .number { color:var(--green); }
+.dash-card.yellow .number { color:var(--yellow); }
+.dash-card.red .number { color:var(--red); }
+.dash-card .label { font-size:12px; color:var(--text2); margin-top:4px; text-transform:uppercase; letter-spacing:.5px; }
+.dash-card .sub { font-size:11px; color:var(--text3); margin-top:8px; }
+
+.dash-row2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:24px; }
+.dash-section { background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:20px; }
+.dash-section h3 { font-size:14px; color:var(--text2); margin-bottom:12px; font-weight:600; }
+.dash-bar { display:flex; height:28px; border-radius:6px; overflow:hidden; margin-bottom:8px; gap:2px; }
+.dash-bar div { display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:#fff; min-width:30px; }
+.dash-legend { display:flex; gap:16px; flex-wrap:wrap; }
+.dash-legend span { font-size:11px; color:var(--text2); display:flex; align-items:center; gap:4px; }
+.dash-legend span::before { content:''; width:10px; height:10px; border-radius:3px; display:inline-block; }
+
+/* TABLE */
+.table-controls { display:flex; gap:12px; margin-bottom:16px; align-items:center; flex-wrap:wrap; }
+.table-controls input, .table-controls select { padding:8px 12px; background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); color:var(--text); font-size:13px; outline:none; }
+.table-controls input { width:280px; }
+.table-controls input:focus, .table-controls select:focus { border-color:var(--accent); }
+.table-controls .count { font-size:13px; color:var(--text2); margin-left:auto; }
+
+.table-wrap { overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius); max-height:calc(100vh - 280px); overflow-y:auto; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+thead { position:sticky; top:0; z-index:10; }
+th { background:var(--bg3); color:var(--text); padding:10px 12px; text-align:left; font-weight:600; white-space:nowrap; border-bottom:2px solid var(--border); cursor:pointer; user-select:none; }
+th:hover { background:#3b4f6b; }
+th .sort-arrow { margin-left:4px; font-size:10px; color:var(--text3); }
+td { padding:8px 12px; border-bottom:1px solid rgba(51,65,85,.5); white-space:nowrap; }
+tr:hover td { background:rgba(99,102,241,.08); }
+tr.row-aluno td { }
+tr.row-externo td { color:#fbbf24; }
+tr.row-outro td { color:#34d399; }
+
+.badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; }
+.badge-sim { background:rgba(34,197,94,.15); color:var(--green); }
+.badge-nao { background:rgba(239,68,68,.15); color:var(--red); }
+.badge-premium { background:rgba(168,85,247,.15); color:var(--purple); }
+.badge-black { background:rgba(255,255,255,.1); color:var(--text); }
+.badge-silver { background:rgba(148,163,184,.15); color:var(--text2); }
+
+/* PLAQUINHAS */
+.plaq-select { padding:4px 8px; background:var(--bg); border:1px solid var(--border); border-radius:4px; color:var(--text); font-size:12px; cursor:pointer; }
+.plaq-check { width:18px; height:18px; cursor:pointer; accent-color:var(--accent); }
+
+/* MODAL */
+.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:500; display:flex; align-items:center; justify-content:center; }
+.modal { background:var(--bg2); border:1px solid var(--border); border-radius:16px; width:90%; max-width:800px; max-height:85vh; overflow-y:auto; padding:28px; }
+.modal h2 { font-size:18px; margin-bottom:4px; }
+.modal h3 { font-size:14px; color:var(--text2); margin:16px 0 8px; font-weight:600; }
+.modal .close-btn { float:right; background:none; border:none; color:var(--text2); font-size:20px; cursor:pointer; padding:4px 8px; }
+.modal .close-btn:hover { color:var(--text); }
+.modal-actions { display:flex; gap:8px; margin-top:20px; justify-content:flex-end; }
+.modal-actions button { padding:10px 20px; border-radius:var(--radius); font-size:14px; font-weight:600; cursor:pointer; border:1px solid var(--border); }
+.modal-actions .btn-primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+.modal-actions .btn-primary:hover { background:var(--accent2); }
+.modal-actions .btn-secondary { background:var(--bg3); color:var(--text); }
+.month-input-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+.month-input-item { background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:10px; }
+.month-input-item label { font-size:11px; color:var(--text2); display:block; margin-bottom:4px; }
+.month-input-item input { width:100%; padding:6px 8px; background:var(--bg2); border:1px solid var(--border); border-radius:4px; color:var(--text); font-size:14px; text-align:right; font-variant-numeric:tabular-nums; }
+.month-input-item input:focus { border-color:var(--accent); outline:none; }
+.month-input-item .auto-badge { font-size:9px; color:var(--green); margin-left:4px; }
+.pdf-status { padding:8px 12px; border-radius:6px; font-size:13px; margin:8px 0; }
+.pdf-status.info { background:rgba(99,102,241,.1); color:var(--accent2); }
+.pdf-status.warn { background:rgba(234,179,8,.1); color:var(--yellow); }
+.pdf-status.err { background:rgba(239,68,68,.1); color:var(--red); }
+.extrato-chip { display:inline-flex; align-items:center; gap:4px; background:rgba(99,102,241,.12); color:var(--accent2); padding:3px 8px; border-radius:4px; font-size:11px; margin:2px; }
+.extrato-chip .remove-btn { cursor:pointer; color:var(--red); font-weight:700; margin-left:2px; }
+.extrato-chip .remove-btn:hover { color:#ff6b6b; }
+
+/* TOAST */
+.toast { position:fixed; bottom:24px; right:24px; background:var(--green); color:#fff; padding:12px 20px; border-radius:var(--radius); font-size:14px; font-weight:500; z-index:999; display:none; animation:fadeIn .3s; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+
+/* RESPONSIVE */
+@media(max-width:900px) {
+  .dash-grid { grid-template-columns:repeat(2,1fr); }
+  .dash-row2 { grid-template-columns:1fr; }
+}
+@media(max-width:600px) {
+  .dash-grid { grid-template-columns:1fr; }
+  .tabs { overflow-x:auto; }
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-box">
+    <h1>Summit NSF 2026</h1>
+    <p>Gestão de Participantes</p>
+    <input type="password" id="pwdInput" placeholder="Senha de acesso" autofocus>
+    <button onclick="doLogin()">Entrar</button>
+    <div class="login-error" id="loginError">Senha incorreta</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app" id="app">
+  <div class="topbar">
+    <h1>Summit <span>NSF 2026</span></h1>
+    <div class="topbar-actions">
+      <label title="Upload BC Summit (.csv)">
+        📋 BC Summit
+        <input type="file" accept=".csv" onchange="handleUpload(this,'bc_summit')">
+      </label>
+      <label title="Upload Sympla Summit (.csv ou .xlsx)">
+        🎟 Sympla Summit
+        <input type="file" accept=".csv,.xlsx" onchange="handleUpload(this,'sympla_summit')">
+      </label>
+      <label title="Upload BC Mansão (.csv)">
+        🏠 BC Mansão
+        <input type="file" accept=".csv" onchange="handleUpload(this,'bc_mansao')">
+      </label>
+      <label title="Upload Sympla Mansão (.csv ou .xlsx)">
+        🏠 Sympla Mansão
+        <input type="file" accept=".csv,.xlsx" onchange="handleUpload(this,'sympla_mansao')">
+      </label>
+      <label title="Upload Alunos Ativos (.csv)">
+        👥 Alunos Ativos
+        <input type="file" accept=".csv" onchange="handleUpload(this,'alunos')">
+      </label>
+      <!-- Comprovantes agora são PDFs por aluno na aba Plaquinhas -->
+      <button onclick="exportData()">⬇ Exportar</button>
+      <button onclick="logout()" style="background:transparent;border-color:var(--red);color:var(--red)">Sair</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="dashboard">Dashboard</div>
+    <div class="tab" data-tab="summit">Summit</div>
+    <div class="tab" data-tab="mansao">Mansão</div>
+    <div class="tab" data-tab="plaquinhas">Plaquinhas</div>
+  </div>
+
+  <div class="content">
+    <!-- DASHBOARD -->
+    <div class="panel active" id="panel-dashboard"></div>
+    <!-- SUMMIT -->
+    <div class="panel" id="panel-summit"></div>
+    <!-- MANSÃO -->
+    <div class="panel" id="panel-mansao"></div>
+    <!-- PLAQUINHAS -->
+    <div class="panel" id="panel-plaquinhas"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ========== CONFIG ==========
+const PASS_HASH = 'b030874bb571318491614fc6eaded526837b8d0eeb3364f3c7ac8f7a549b3237'; // senha: summit2026
+
+async function sha256(msg) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(msg));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+// ========== STATE ==========
+let STATE = {
+  summit: [],    // pessoas summit
+  mansao: [],    // pessoas mansão
+  plaquinhas: {} // email -> { comprovante: bool, tipo: string }
+};
+
+function saveState() {
+  try { localStorage.setItem('summit_nsf_2026', JSON.stringify(STATE)); } catch(e) { console.warn('Erro ao salvar STATE:', e); }
+}
+function loadState() {
+  try {
+    const s = localStorage.getItem('summit_nsf_2026');
+    if (s) { STATE = JSON.parse(s); return true; }
+  } catch(e) { console.warn('Erro ao carregar STATE:', e); }
+  return false;
+}
+
+function saveRaw() {
+  try {
+    localStorage.setItem('summit_nsf_raw', JSON.stringify(RAW));
+    console.log('RAW salvo:', Object.entries(RAW).map(([k,v])=>`${k}:${v.length}`).join(', '));
+  } catch(e) {
+    console.warn('Erro ao salvar RAW (possível limite de localStorage):', e);
+    // Se exceder limite, tentar salvar sem os dados mais pesados
+    try {
+      const lite = {...RAW};
+      // Manter pelo menos BC e Alunos que são menores
+      delete lite.sympla_summit;
+      delete lite.sympla_mansao;
+      localStorage.setItem('summit_nsf_raw', JSON.stringify(lite));
+      toast('⚠ Dados Sympla grandes demais para cache local. Re-importe Sympla após recarregar.');
+    } catch(e2) { console.warn('Erro ao salvar RAW lite:', e2); }
+  }
+}
+function loadRaw() {
+  try {
+    const s = localStorage.getItem('summit_nsf_raw');
+    if (s) {
+      RAW = JSON.parse(s);
+      console.log('RAW restaurado:', Object.entries(RAW).map(([k,v])=>`${k}:${v.length}`).join(', '));
+      return true;
+    }
+  } catch(e) { console.warn('Erro ao carregar RAW:', e); }
+  return false;
+}
+
+// ========== LOGIN ==========
+async function doLogin() {
+  const pwd = document.getElementById('pwdInput').value;
+  const hash = await sha256(pwd);
+  if (hash === PASS_HASH) {
+    document.getElementById('loginOverlay').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    sessionStorage.setItem('summit_auth', '1');
+    initData();
+  } else {
+    document.getElementById('loginError').style.display = 'block';
+    document.getElementById('pwdInput').value = '';
+    document.getElementById('pwdInput').focus();
+  }
+}
+document.getElementById('pwdInput').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+
+function logout() {
+  sessionStorage.removeItem('summit_auth');
+  location.reload();
+}
+
+// Recalcular plaquinhas de todos os alunos a partir de STATE.plaquinhas[email].extratos
+function recalcAllPlaquinhas() {
+  for (const [email, plaq] of Object.entries(STATE.plaquinhas)) {
+    if (!plaq.extratos || !plaq.extratos.length) continue;
+    // Consolidar meses de todos os extratos (somar se mesmo mês em bancos diferentes)
+    const mesesConsolidado = {};
+    plaq.extratos.forEach(ext => {
+      if (!ext.meses) return;
+      for (const [m, v] of Object.entries(ext.meses)) {
+        mesesConsolidado[m] = (mesesConsolidado[m] || 0) + v;
+      }
+    });
+    plaq.meses = mesesConsolidado;
+    const monthValues = Object.values(mesesConsolidado);
+    plaq.fat_total = monthValues.reduce((s,v) => s+v, 0);
+    plaq.fat_maior_mes = monthValues.length ? Math.max(...monthValues) : 0;
+
+    const ptier = classifyPlaquinhaTotal(plaq.fat_total);
+    plaq.plaq_total = ptier ? ptier.label : '—';
+
+    const mensaisAcumulo = classifyPlaquinhasMensaisAcumulo(mesesConsolidado);
+    plaq.plaq_mensais = mensaisAcumulo;
+    plaq.plaq_mensal_labels = mensaisAcumulo.map(m => m.tier.label);
+    plaq.plaq_mensal = mensaisAcumulo.length ? mensaisAcumulo[0].tier.label : '—';
+    plaq.qtd_plaquinhas_mensais = mensaisAcumulo.length;
+  }
+  saveState();
+}
+
+function initData() {
+  loadState();
+  const hasRaw = loadRaw();
+  if (hasRaw) {
+    // Rebuild from RAW data to ensure STATE is fresh
+    const hasAnySummit = RAW.bc_summit.length > 0 || RAW.sympla_summit.length > 0;
+    const hasAnyMansao = RAW.bc_mansao.length > 0 || RAW.sympla_mansao.length > 0;
+    if (hasAnySummit) rebuildSummit();
+    if (hasAnyMansao) rebuildMansao();
+    // Recalcular plaquinhas a partir de extratos salvos
+    recalcAllPlaquinhas();
+    if (!hasAnySummit && !hasAnyMansao) renderAll();
+    const parts = [];
+    if (RAW.bc_summit.length) parts.push(`BC Summit: ${RAW.bc_summit.length}`);
+    if (RAW.sympla_summit.length) parts.push(`Sympla Summit: ${RAW.sympla_summit.length}`);
+    if (RAW.bc_mansao.length) parts.push(`BC Mansão: ${RAW.bc_mansao.length}`);
+    if (RAW.sympla_mansao.length) parts.push(`Sympla Mansão: ${RAW.sympla_mansao.length}`);
+    if (RAW.alunos.length) parts.push(`Alunos: ${RAW.alunos.length}`);
+    const plaqCount = Object.values(STATE.plaquinhas).filter(p=>p.extratos?.length).length;
+    if (plaqCount) parts.push(`Extratos: ${plaqCount} alunos`);
+    if (parts.length) toast('Dados restaurados: ' + parts.join(' · '));
+  } else {
+    renderAll();
+  }
+}
+
+// Auto-login if session active
+if (sessionStorage.getItem('summit_auth')) {
+  document.getElementById('loginOverlay').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  setTimeout(initData, 100);
+}
+
+// ========== TABS ==========
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('panel-'+t.dataset.tab).classList.add('active');
+  });
+});
+
+// ========== TOAST ==========
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(()=>{ t.style.display='none'; }, 3000);
+}
+
+// ========== UPLOAD HANDLERS ==========
+function handleUpload(input, type) {
+  const file = input.files[0];
+  if (!file) return;
+  const isXlsx = file.name.toLowerCase().endsWith('.xlsx');
+  const isSympla = (type === 'sympla_summit' || type === 'sympla_mansao');
+  const reader = new FileReader();
+
+  if (isSympla && !isXlsx) {
+    // CSV path for Sympla — dedicated parser handles header rows + semicolon
+    reader.onload = (e) => {
+      const text = e.target.result;
+      if (text.length < 50) { toast('Erro: arquivo CSV vazio'); return; }
+      if (type === 'sympla_summit') processSymplaCSV(text, 'summit');
+      else processSymplaCSV(text, 'mansao');
+    };
+    reader.readAsText(file, 'utf-8');
+  } else if (isSympla && isXlsx) {
+    // XLSX path for Sympla — with fallback detection
+    reader.onload = (e) => {
+      try {
+        const wb = XLSX.read(e.target.result, {type:'array', cellDates:false, raw:true});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const ref = ws['!ref'] || '';
+        const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:true, blankrows:true});
+        console.log(`[${type}] XLSX Ref: ${ref}, Rows: ${rows.length}`);
+
+        // Detect single-column bug: if SheetJS reads ≤1 column, the file is incompatible
+        const range = XLSX.utils.decode_range(ref);
+        const numCols = range.e.c - range.s.c + 1;
+        if (numCols <= 1) {
+          toast('⚠ Formato XLSX incompatível. Exporte o arquivo do Sympla como CSV e tente novamente.');
+          console.warn('SheetJS leu apenas 1 coluna — arquivo Sympla com formato incompatível. Use CSV.');
+          return;
+        }
+
+        if (rows.length < 5) { toast(`Erro: planilha vazia (${rows.length} linhas)`); return; }
+        if (type === 'sympla_summit') processSymplaSummit(rows);
+        else processSymplaMansao(rows);
+      } catch(err) {
+        console.error('Erro ao ler XLSX:', err);
+        toast('Erro ao ler XLSX. Tente exportar como CSV no Sympla.');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    // CSV path for BC / Alunos / Comprovantes
+    reader.onload = (e) => {
+      const text = e.target.result;
+      if (type === 'bc_summit') processBCSummit(text);
+      else if (type === 'bc_mansao') processBCMansao(text);
+      else if (type === 'alunos') processAlunos(text);
+    };
+    reader.readAsText(file, 'utf-8');
+  }
+  input.value = '';
+}
+
+function parseCSV(text, delim=',') {
+  // Strip BOM and normalize line endings
+  text = text.replace(/^\xEF\xBB\xBF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  if (!text.trim()) return [];
+
+  // Detect delimiter from first line
+  const firstNewline = text.indexOf('\n');
+  const firstLine = firstNewline > 0 ? text.substring(0, firstNewline) : text;
+  if (firstLine.includes(';') && !firstLine.includes(',')) delim = ';';
+
+  // Parse all records handling multi-line quoted fields
+  const records = parseCSVRecords(text, delim);
+  if (records.length < 2) return [];
+
+  const headers = records[0].map(h => h.trim());
+  return records.slice(1).filter(r => r.length > 1 || (r.length === 1 && r[0].trim())).map(vals => {
+    const obj = {};
+    headers.forEach((h, i) => { if (h) obj[h] = (vals[i] || '').trim(); });
+    return obj;
+  });
+}
+
+// Parse CSV text into array of arrays, correctly handling quoted fields with newlines
+function parseCSVRecords(text, delim) {
+  const records = [];
+  let current = [];
+  let field = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+
+    if (inQuotes) {
+      if (ch === '"') {
+        if (i + 1 < text.length && text[i + 1] === '"') {
+          field += '"'; // escaped quote
+          i++;
+        } else {
+          inQuotes = false; // end of quoted field
+        }
+      } else {
+        field += ch; // include newlines inside quotes
+      }
+    } else {
+      if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === delim) {
+        current.push(field);
+        field = '';
+      } else if (ch === '\n') {
+        current.push(field);
+        field = '';
+        records.push(current);
+        current = [];
+      } else {
+        field += ch;
+      }
+    }
+  }
+  // Last field/record
+  if (field || current.length) {
+    current.push(field);
+    records.push(current);
+  }
+  return records;
+}
+
+function ne(s) { return (s||'').trim().toLowerCase(); }
+
+// ========== DATA PROCESSORS ==========
+let RAW = { bc_summit:[], sympla_summit:[], bc_mansao:[], sympla_mansao:[], alunos:[], comprovantes:[] };
+
+// Parse Sympla CSV — handles institutional header rows + semicolon delimiter
+function parseSymplaCSV(text) {
+  // Sympla CSV: BOM + 7 header lines (event name, date, venue, blanks) + real headers + data
+  // Delimiter: semicolon (;)
+  text = text.replace(/^\xEF\xBB\xBF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const lines = text.split('\n');
+
+  // Find the real header row: contains both "Ordem" and "Email"
+  let headerIdx = -1;
+  for (let i = 0; i < Math.min(lines.length, 20); i++) {
+    if (lines[i].includes('Ordem') && lines[i].includes('Email')) {
+      headerIdx = i;
+      break;
+    }
+  }
+  if (headerIdx === -1) {
+    console.error('Sympla CSV: header row not found in first 20 lines');
+    return [];
+  }
+
+  console.log(`Sympla CSV: header found at line ${headerIdx}`);
+
+  // Use parseCSVRecords from headerIdx onwards (handles multi-line quoted fields)
+  const dataText = lines.slice(headerIdx).join('\n');
+  const records = parseCSVRecords(dataText, ';');
+  if (records.length < 2) return [];
+
+  const headers = records[0].map(h => h.trim());
+  console.log(`Sympla CSV headers: ${headers.filter(h=>h).length} columns`);
+
+  const rows = records.slice(1).filter(r => r.length > 1 || (r.length === 1 && r[0].trim())).map(vals => {
+    const obj = {};
+    headers.forEach((h, i) => { if (h) obj[h] = (vals[i] || '').trim(); });
+    return obj;
+  }).filter(obj => {
+    const email = getField(obj, 'Email', 'email');
+    return email && email.includes('@');
+  });
+
+  console.log(`Sympla CSV parsed: ${rows.length} valid rows`);
+  return rows;
+}
+
+// Process Sympla CSV (works for both summit and mansão)
+function processSymplaCSV(text, target) {
+  const rows = parseSymplaCSV(text);
+
+  if (rows.length === 0) {
+    toast('Erro: nenhum dado válido encontrado no CSV. Verifique o formato.');
+    return;
+  }
+
+  if (target === 'summit') {
+    RAW.sympla_summit = rows;
+    const aprovados = rows.filter(r => getField(r, 'Estado de pagamento', 'Status') === 'Aprovado').length;
+    const cancelados = rows.filter(r => getField(r, 'Estado de pagamento', 'Status') === 'Cancelado').length;
+    toast(`Sympla Summit: ${aprovados} aprovados, ${cancelados} cancelados`);
+    saveRaw();
+    rebuildSummit();
+  } else {
+    RAW.sympla_mansao = rows;
+    const aprovados = rows.filter(r => getField(r, 'Estado de pagamento', 'Status') === 'Aprovado').length;
+    toast(`Sympla Mansão: ${aprovados} aprovados`);
+    saveRaw();
+    rebuildMansao();
+  }
+}
+
+function processBCSummit(text) {
+  RAW.bc_summit = parseCSV(text);
+  toast(`BC Summit carregado: ${RAW.bc_summit.length} linhas`);
+  saveRaw();
+  rebuildSummit();
+}
+
+function processSymplaSummit(rows) {
+  // Find header row - search for row containing 'Ordem' or 'Email'
+  let hi = -1;
+  for (let i = 0; i < Math.min(rows.length, 20); i++) {
+    if (!rows[i]) continue;
+    const rowStr = rows[i].map(c => String(c||'')).join('|');
+    if (rowStr.includes('Ordem') && rowStr.includes('Email')) { hi = i; break; }
+    if (rowStr.includes('Tipo de ingresso')) { hi = i; break; }
+  }
+  if (hi === -1) {
+    // Fallback: try first row as header
+    hi = 0;
+    // If first row doesn't look like headers, try row 7 (Sympla default)
+    if (rows.length > 7 && rows[7] && rows[7].some(c => String(c||'').includes('Ordem'))) hi = 7;
+  }
+
+  console.log('Sympla header found at row:', hi, rows[hi]?.slice(0,5));
+  const headers = rows[hi].map(c => String(c||'').trim());
+  const data = rows.slice(hi+1).filter(r => {
+    if (!r || r.length < 3) return false;
+    // Skip empty rows
+    const hasContent = r.some(c => c !== null && c !== undefined && String(c).trim() !== '');
+    return hasContent;
+  });
+
+  RAW.sympla_summit = data.map(r => {
+    const obj = {};
+    headers.forEach((h,i) => {
+      if (h) obj[h] = r[i] !== undefined && r[i] !== null ? String(r[i]).trim() : '';
+    });
+    return obj;
+  });
+
+  // Debug & validation
+  console.log('Sympla Summit headers:', headers.filter(h=>h));
+  console.log('Sympla Summit total rows:', RAW.sympla_summit.length);
+  if (RAW.sympla_summit.length > 0) {
+    console.log('First row keys:', Object.keys(RAW.sympla_summit[0]));
+    console.log('First row sample:', JSON.stringify(RAW.sympla_summit[0]).slice(0,300));
+  }
+
+  // Count aprovados for validation
+  const aprovados = RAW.sympla_summit.filter(r => {
+    const st = getField(r, 'Estado de pagamento', 'Status');
+    return st === 'Aprovado';
+  }).length;
+  const cancelados = RAW.sympla_summit.filter(r => {
+    const st = getField(r, 'Estado de pagamento', 'Status');
+    return st === 'Cancelado';
+  }).length;
+
+  if (aprovados === 0 && RAW.sympla_summit.length > 0) {
+    console.warn('ALERTA: Nenhum aprovado encontrado! Verificar nome da coluna de status.');
+    console.log('Campos disponíveis:', Object.keys(RAW.sympla_summit[0]));
+    toast(`Atenção: ${RAW.sympla_summit.length} linhas lidas mas 0 aprovados. Verifique o formato.`);
+    return;
+  }
+
+  toast(`Sympla Summit: ${aprovados} aprovados, ${cancelados} cancelados`);
+  saveRaw();
+  rebuildSummit();
+}
+
+function processBCMansao(text) {
+  RAW.bc_mansao = parseCSV(text);
+  toast(`BC Mansão carregado: ${RAW.bc_mansao.length} linhas`);
+  saveRaw();
+  rebuildMansao();
+}
+
+function processSymplaMansao(rows) {
+  let hi = -1;
+  for (let i = 0; i < Math.min(rows.length, 20); i++) {
+    if (!rows[i]) continue;
+    const rowStr = rows[i].map(c => String(c||'')).join('|');
+    if (rowStr.includes('Ordem') && rowStr.includes('Email')) { hi = i; break; }
+    if (rowStr.includes('Tipo de ingresso')) { hi = i; break; }
+  }
+  if (hi === -1) {
+    hi = 0;
+    if (rows.length > 7 && rows[7] && rows[7].some(c => String(c||'').includes('Ordem'))) hi = 7;
+  }
+
+  const headers = rows[hi].map(c => String(c||'').trim());
+  const data = rows.slice(hi+1).filter(r => {
+    if (!r || r.length < 3) return false;
+    return r.some(c => c !== null && c !== undefined && String(c).trim() !== '');
+  });
+
+  RAW.sympla_mansao = data.map(r => {
+    const obj = {};
+    headers.forEach((h,i) => {
+      if (h) obj[h] = r[i] !== undefined && r[i] !== null ? String(r[i]).trim() : '';
+    });
+    return obj;
+  });
+  toast(`Sympla Mansão carregado: ${RAW.sympla_mansao.length} linhas`);
+  saveRaw();
+  rebuildMansao();
+}
+
+function processAlunos(text) {
+  RAW.alunos = parseCSV(text);
+  toast(`Alunos Ativos carregado: ${RAW.alunos.length} linhas`);
+  saveRaw();
+  rebuildSummit();
+}
+
+// ========== PLAQUINHAS CLASSIFICATION ==========
+// Faturamento Total thresholds (descending, with tolerance applied)
+const PLAQ_TOTAL_TIERS = [
+  { label: '5M',   min: 4750000, icon: '🌈' },
+  { label: '4M',   min: 3800000, icon: '💥' },
+  { label: '3M',   min: 2850000, icon: '🌟' },
+  { label: '2M',   min: 1900000, icon: '💫' },
+  { label: '1M',   min: 950000,  icon: '👑' },
+  { label: '750K', min: 712500,  icon: '🔷' },
+  { label: '500K', min: 475000,  icon: '🔶' },
+  { label: '350K', min: 332500,  icon: '🏵' },
+  { label: '200K', min: 180000,  icon: '🥇' },
+  { label: '100K', min: 90000,   icon: '💍' },
+  { label: '50K',  min: 45000,   icon: '💎' },
+];
+
+// Faturamento Mensal thresholds (descending, with tolerance applied)
+const PLAQ_MENSAL_TIERS = [
+  { label: '500K/mês', min: 475000, icon: '👑' },
+  { label: '400K/mês', min: 380000, icon: '🏆' },
+  { label: '300K/mês', min: 285000, icon: '💎' },
+  { label: '200K/mês', min: 190000, icon: '🔥' },
+  { label: '100K/mês', min: 90000,  icon: '🌟' },
+  { label: '40K/mês',  min: 36000,  icon: '✨' },
+];
+
+function classifyPlaquinhaTotal(total) {
+  for (const t of PLAQ_TOTAL_TIERS) {
+    if (total >= t.min) return t;
+  }
+  return null;
+}
+
+function classifyPlaquinhaMensal(valor) {
+  for (const t of PLAQ_MENSAL_TIERS) {
+    if (valor >= t.min) return t;
+  }
+  return null;
+}
+
+// Regra de Acúmulo: retorna todos os tiers DISTINTOS atingidos em meses diferentes
+function classifyPlaquinhasMensaisAcumulo(byMonth) {
+  const achievedTiers = new Map(); // label -> {tier, months:[]}
+  for (const [month, value] of Object.entries(byMonth)) {
+    const tier = classifyPlaquinhaMensal(value);
+    if (tier) {
+      if (!achievedTiers.has(tier.label)) {
+        achievedTiers.set(tier.label, { tier, months: [] });
+      }
+      achievedTiers.get(tier.label).months.push(month);
+    }
+  }
+  // Retorna array de tiers distintos (ordenados do maior para menor)
+  const result = [...achievedTiers.values()].sort((a, b) => b.tier.min - a.tier.min);
+  return result;
+}
+
+// ========== PDF EXTRATO PARSER ==========
+const MONTH_MAP = {
+  'JAN':'01','FEB':'02','FEV':'02','MAR':'03','APR':'04','ABR':'04',
+  'MAY':'05','MAI':'05','JUN':'06','JUL':'07','AUG':'08','AGO':'08',
+  'SEP':'09','SET':'09','OCT':'10','OUT':'10','NOV':'11','DEC':'12','DEZ':'12'
+};
+const NON_REVENUE_PATTERNS = ['Resgate RDB', 'Estorno', 'Crédito em conta', 'Rendimento líquido'];
+
+async function extractPDFText(file) {
+  const ab = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data: ab}).promise;
+  let fullText = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const tc = await page.getTextContent();
+    const lines = [];
+    let lastY = null;
+    let currentLine = '';
+    tc.items.forEach(item => {
+      const y = Math.round(item.transform[5]);
+      if (lastY !== null && Math.abs(y - lastY) > 3) {
+        lines.push(currentLine);
+        currentLine = '';
+      }
+      currentLine += (currentLine ? ' ' : '') + item.str;
+      lastY = y;
+    });
+    if (currentLine) lines.push(currentLine);
+    fullText += lines.join('\n') + '\n';
+  }
+
+  // If very little text extracted, try OCR on rendered pages
+  const cleanText = fullText.replace(/\s+/g, '').trim();
+  if (cleanText.length < 30) {
+    console.log('PDF text too short, falling back to OCR...');
+    fullText = await ocrPDFPages(pdf);
+  }
+
+  return fullText;
+}
+
+async function ocrPDFPages(pdf) {
+  let fullText = '';
+  const worker = await Tesseract.createWorker('por');
+  try {
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: 2.0 }); // Higher scale = better OCR
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext('2d');
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      const { data } = await worker.recognize(canvas);
+      fullText += data.text + '\n';
+    }
+  } finally {
+    await worker.terminate();
+  }
+  return fullText;
+}
+
+async function extractImageText(file) {
+  const worker = await Tesseract.createWorker('por');
+  try {
+    const { data } = await worker.recognize(file);
+    return data.text;
+  } finally {
+    await worker.terminate();
+  }
+}
+
+function detectBankAndParse(text, filename) {
+  console.log('[detectBankAndParse] First 500 chars:', text.substring(0, 500));
+  // 0. Check for Contrato de Prestação de Serviços (handles pdf.js concatenation/line breaks)
+  const isContrato = /Contrato[\s\S]{0,5}de[\s\S]{0,5}Presta[çc][ãa]o[\s\S]{0,5}de[\s\S]{0,5}Servi[çc]os/i.test(text) ||
+                     /ContratodePresta[çc][ãa]odeServi[çc]os/i.test(text);
+  if (isContrato) {
+    const parsed = parseContrato(text);
+    return {
+      banco: 'Contrato',
+      periodo: parsed.details?.[0]?.data || '',
+      titular: '',
+      meses: parsed.entradas || {},
+      non_revenue: {},
+      meses_liquido: parsed.liquido || {},
+      total_bruto: parsed.total_bruto || 0,
+      total_non_rev: 0,
+      total_liquido: parsed.total_liquido || 0,
+      warnings: parsed.warnings || [],
+      details: parsed.details || [],
+      isComprovante: true
+    };
+  }
+
+  // 1. Check for NFS-e (Nota Fiscal de Serviço Eletrônica)
+  const isNFSe = /NFS-?e/i.test(text) && (/Valor\s*(do|dos)\s*Servi/i.test(text) || /ValordoServi/i.test(text));
+  if (isNFSe) {
+    const parsed = parseNFSe(text);
+    const dates = parsed.details?.map(d => d.data) || [];
+    return {
+      banco: 'NFS-e',
+      periodo: dates[0] || '',
+      titular: parsed.titular || '',
+      meses: parsed.entradas || {},
+      non_revenue: {},
+      meses_liquido: parsed.liquido || {},
+      total_bruto: parsed.total_bruto || 0,
+      total_non_rev: 0,
+      total_liquido: parsed.total_liquido || 0,
+      warnings: parsed.warnings || [],
+      details: parsed.details || [],
+      isComprovante: true
+    };
+  }
+
+  // 2. Check if it's a payment receipt (comprovante) — Pix, Asaas, etc.
+  const isComprovante = /Comprovante\s+de\s+(pagamento|transfer[êe]ncia)/i.test(text) ||
+                        /Valor\s+pago.*Data\s+da\s+confirma/is.test(text) ||
+                        /Pix\s+(conclu[ií]do|Enviado)/i.test(text) ||
+                        /Comprovante\s+(do\s+)?Pix/i.test(text) ||
+                        /Comprovante\s+BB/i.test(text);
+
+  if (isComprovante) {
+    let banco = 'Comprovante';
+    if (/Asaas/i.test(text)) banco = 'Asaas';
+    else if (/PagSeguro/i.test(text)) banco = 'PagSeguro';
+    else if (/Mercado\s*Pago/i.test(text)) banco = 'MercadoPago';
+    else if (/SANTANDER/i.test(text)) banco = 'Santander';
+    else if (/Bradesco/i.test(text)) banco = 'Bradesco';
+    else if (/Comprovante\s+BB|BCO DO BRASIL/i.test(text)) banco = 'BB';
+    else if (/SICOOB/i.test(text)) banco = 'Sicoob';
+    else if (/ITA[ÚU]/i.test(text)) banco = 'Itaú';
+    else if (/INTER/i.test(text)) banco = 'Inter';
+
+    const parsed = parseComprovante(text);
+    const dates = parsed.details?.map(d => d.data) || [];
+    const periodo = dates.length ? (dates.length === 1 ? dates[0] : `${dates[0]} a ${dates[dates.length-1]}`) : '';
+
+    return {
+      banco, periodo,
+      titular: parsed.titular || '',
+      meses: parsed.entradas || {},
+      non_revenue: {},
+      meses_liquido: parsed.liquido || {},
+      total_bruto: parsed.total_bruto || 0,
+      total_non_rev: 0,
+      total_liquido: parsed.total_liquido || 0,
+      warnings: parsed.warnings || [],
+      details: parsed.details || [],
+      isComprovante: true
+    };
+  }
+
+  // 3. Check for PagBank/PagSeguro "Relatório de Vendas"
+  const isRelatorioVendas = /Relat[óo]rio\s+de\s+Vendas/i.test(text) ||
+                            (/Pagbank/i.test(text) && /Valor\s+bruto.*Taxa.*Valor\s+l[íi]quido/i.test(text));
+  if (isRelatorioVendas) {
+    const parsed = parsePagBank(text);
+    let periodo = '';
+    const pmatch = text.match(/Per[íi]odo\s+(\d{2}\/\d{2}\/\d{4})\s+a\s+(\d{2}\/\d{2}\/\d{4})/i);
+    if (pmatch) periodo = `${pmatch[1]} a ${pmatch[2]}`;
+    return {
+      banco: 'PagBank',
+      periodo,
+      titular: parsed.titular || '',
+      meses: parsed.entradas,
+      non_revenue: {},
+      meses_liquido: parsed.liquido,
+      total_bruto: parsed.total_bruto,
+      total_non_rev: 0,
+      total_liquido: parsed.total_liquido,
+      warnings: parsed.warnings,
+      details: parsed.details,
+      isComprovante: false
+    };
+  }
+
+  // 3. Bank statement detection
+  let banco = 'Desconhecido';
+  if (/nubank|Nu\s+Financeira|Nu\s+Pagamentos/i.test(text)) banco = 'Nubank';
+  else if (/ITA[ÚU]|itau\.com/i.test(text)) banco = 'Itaú';
+  else if (/BRADESCO|bradesco\.com/i.test(text)) banco = 'Bradesco';
+  else if (/SANTANDER|santander\.com/i.test(text)) banco = 'Santander';
+  else if (/Banco\s+Inter|bancointer/i.test(text)) banco = 'Inter';
+  else if (/CAIXA\s+ECON|caixa\.gov/i.test(text)) banco = 'Caixa';
+  else if (/BANCO\s+DO\s+BRASIL|bb\.com/i.test(text)) banco = 'BB';
+  else if (/SICOOB/i.test(text)) banco = 'Sicoob';
+  else if (/C6\s+BANK|C6\s+S\.?A/i.test(text)) banco = 'C6 Bank';
+  else if (/InfinitePay|CLOUDWALK|infinitepay/i.test(text)) banco = 'InfinitiPay';
+  else if (/Sicredi/i.test(text)) banco = 'Sicredi';
+  else if (/Unicred/i.test(text)) banco = 'Unicredi';
+  else if (/PagBank|PagSeguro/i.test(text)) banco = 'PagBank';
+  else if (/Mercado\s*Pago/i.test(text)) banco = 'MercadoPago';
+  else if (/Stone/i.test(text)) banco = 'Stone';
+  else if (/Rede\b/i.test(text)) banco = 'Rede';
+  else if (/Cielo/i.test(text)) banco = 'Cielo';
+  else if (/Safra/i.test(text)) banco = 'Safra';
+  else if (/Original/i.test(text)) banco = 'Original';
+  else if (/BRB|Banco\s+de\s+Bras[ií]lia/i.test(text)) banco = 'BRB';
+  else if (/Banrisul/i.test(text)) banco = 'Banrisul';
+  else if (/Cresol/i.test(text)) banco = 'Cresol';
+  else if (/Asaas/i.test(text)) banco = 'Asaas';
+  else if (/iFood/i.test(text)) banco = 'iFood';
+  else if (/ZOOP/i.test(text)) banco = 'Zoop';
+
+  // Detect period
+  let periodo = '';
+  const periodMatch = text.match(/(\d{2})\s+DE\s+(\w+)\s+DE\s+(\d{4})\s+a\s+(\d{2})\s+DE\s+(\w+)\s+DE\s+(\d{4})/i);
+  if (periodMatch) {
+    periodo = `${periodMatch[1]}/${periodMatch[2]}/${periodMatch[3]} a ${periodMatch[4]}/${periodMatch[5]}/${periodMatch[6]}`;
+  }
+  const periodMatch2 = text.match(/(\d{2})\/(\d{2})\/(\d{4})\s+a\s+(\d{2})\/(\d{2})\/(\d{4})/);
+  if (!periodo && periodMatch2) {
+    periodo = `${periodMatch2[1]}/${periodMatch2[2]}/${periodMatch2[3]} a ${periodMatch2[4]}/${periodMatch2[5]}/${periodMatch2[6]}`;
+  }
+
+  // Parse monthly entradas
+  let monthlyEntradas = {};
+
+  if (banco === 'Nubank') {
+    monthlyEntradas = parseNubank(text);
+  } else {
+    monthlyEntradas = parseNubank(text);
+    if (Object.keys(monthlyEntradas.entradas || {}).length === 0) {
+      monthlyEntradas = parseGeneric(text, filename);
+    }
+  }
+
+  return {
+    banco,
+    periodo,
+    titular: '',
+    meses: monthlyEntradas.entradas || {},
+    non_revenue: monthlyEntradas.non_revenue || {},
+    meses_liquido: monthlyEntradas.liquido || {},
+    total_bruto: monthlyEntradas.total_bruto || 0,
+    total_non_rev: monthlyEntradas.total_non_rev || 0,
+    total_liquido: monthlyEntradas.total_liquido || 0,
+    warnings: monthlyEntradas.warnings || []
+  };
+}
+
+function parseNubank(text) {
+  const lines = text.split('\n');
+  const entradas = {};    // YYYY-MM -> value (bruto)
+  const non_revenue = {};  // YYYY-MM -> value
+  let currentMonth = null;
+  let inEntradas = false;
+
+  for (const line of lines) {
+    // Detect date: "08 MAR 2025" or "13 MAR 2025"
+    const dm = line.match(/^(\d{2})\s+(JAN|FEB|FEV|MAR|APR|ABR|MAY|MAI|JUN|JUL|AUG|AGO|SEP|SET|OCT|OUT|NOV|DEC|DEZ)\s+(\d{4})/);
+    if (dm) {
+      const mm = MONTH_MAP[dm[2]] || '00';
+      currentMonth = `${dm[3]}-${mm}`;
+    }
+
+    // Detect "Total de entradas"
+    const entradaMatch = line.match(/Total de entradas\s*\+?\s*([\d.,]+)/);
+    if (entradaMatch && currentMonth) {
+      const val = parseFloat(entradaMatch[1].replace(/\./g, '').replace(',', '.'));
+      entradas[currentMonth] = (entradas[currentMonth] || 0) + val;
+      inEntradas = true;
+      continue;
+    }
+
+    if (/Total de sa[ií]das|Saldo do dia/.test(line)) {
+      inEntradas = false;
+      continue;
+    }
+
+    // In entradas section, detect non-revenue
+    if (inEntradas && currentMonth) {
+      for (const pattern of NON_REVENUE_PATTERNS) {
+        if (line.includes(pattern)) {
+          const valMatch = line.match(/([\d.]+,\d{2})\s*$/);
+          if (valMatch) {
+            const val = parseFloat(valMatch[1].replace(/\./g, '').replace(',', '.'));
+            non_revenue[currentMonth] = (non_revenue[currentMonth] || 0) + val;
+          }
+        }
+      }
+    }
+  }
+
+  // Compute líquido
+  const liquido = {};
+  let total_bruto = 0, total_non_rev = 0;
+  for (const m of Object.keys(entradas)) {
+    const bruto = entradas[m];
+    const nr = non_revenue[m] || 0;
+    liquido[m] = bruto - nr;
+    total_bruto += bruto;
+    total_non_rev += nr;
+  }
+
+  const warnings = [];
+  if (Object.keys(entradas).length === 0) warnings.push('Nenhuma entrada encontrada no formato Nubank');
+
+  return { entradas, non_revenue, liquido, total_bruto, total_non_rev, total_liquido: total_bruto - total_non_rev, warnings };
+}
+
+function parseNFSe(text) {
+  const entradas = {};
+  let total = 0;
+  const warnings = [];
+  const details = [];
+  let titular = '';
+
+  // Extract titular (prestador de serviço)
+  // Antigo: "Nome/Razão Social NOME AQUI"
+  let tm = text.match(/Nome\/Raz[ãa]o\s+Social\s+([A-ZÀ-Ú][A-ZÀ-Ú\s]+(?:LTDA|ME|EIRELI|S\.?A\.?)?)/i);
+  // Novo DANFSe: "Nome/NomeEmpresarial E-mail\nNOMESEMESPACO EMAIL"
+  if (!tm) tm = text.match(/Nome\/NomeEmpresarial\s+E-mail\s*\n?\s*([A-ZÀ-Ú][A-ZÀ-Úa-zà-ú]+(?:\s+\S+)?)/);
+  if (tm) titular = tm[1].trim();
+  // Also try CNPJ
+  const cnpjMatch = text.match(/(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/);
+  if (cnpjMatch) titular = (titular ? titular + ' ' : '') + '(CNPJ ' + cnpjMatch[1] + ')';
+
+  // Find date (competência)
+  let dateMatch = text.match(/Compet[êe]ncia(?:daNFS-e)?\s*(\d{2})\/(\d{2})\/(\d{4})/i);
+  if (!dateMatch) dateMatch = text.match(/Data\s*(?:de\s*)?[Ee]miss[ãa]o\s*(?:daNFS-e)?\s*(\d{2})\/(\d{2})\/(\d{4})/i);
+  if (!dateMatch) {
+    // Fallback: first date in text
+    dateMatch = text.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  }
+
+  // Find value (may be on different line from label in DANFSe format)
+  let valor = 0;
+  // Try "Valor dos serviços = R$ X.XXX,XX" (antigo, same line)
+  let valMatch = text.match(/Valor\s+dos?\s+servi[çc]os?\s*=?\s*R\$\s*([\d.,]+)/i);
+  // Try "ValordoServiço" then R$ on same or next line (novo DANFSe)
+  if (!valMatch) valMatch = text.match(/ValordoServi[çc]o[\s\S]*?R\$([\d.,]+)/i);
+  // Try "Valor do Serviço" with spaces, cross-line
+  if (!valMatch) valMatch = text.match(/Valor\s+do\s+Servi[çc]o[\s\S]*?R\$([\d.,]+)/i);
+  // Try "ValorLíquidodaNFS-e" cross-line
+  if (!valMatch) valMatch = text.match(/Valor\s*L[ií]quido\s*(?:da\s*)?NFS-?e[\s\S]*?R\$([\d.,]+)/i);
+  if (!valMatch) valMatch = text.match(/ValorL[ií]quidodaNFS-?e[\s\S]*?R\$([\d.,]+)/i);
+  // Last resort: find "VALOR TOTAL DA NOTA" or similar
+  if (!valMatch) valMatch = text.match(/VALOR\s*TOTAL[\s\S]*?R\$([\d.,]+)/i);
+
+  if (valMatch) {
+    valor = parseFloat(valMatch[1].replace(/\./g, '').replace(',', '.'));
+  }
+
+  if (dateMatch && valor > 0) {
+    const dd = dateMatch[1], mm = dateMatch[2], yyyy = dateMatch[3];
+    const monthKey = `${yyyy}-${mm}`;
+    entradas[monthKey] = (entradas[monthKey] || 0) + valor;
+    total += valor;
+    details.push({ valor, data: `${dd}/${mm}/${yyyy}`, month: monthKey });
+  } else {
+    if (!dateMatch) warnings.push('Data não encontrada na NFS-e');
+    if (valor === 0) warnings.push('Valor não encontrado na NFS-e');
+  }
+
+  return {
+    entradas, non_revenue: {}, liquido: { ...entradas },
+    total_bruto: total, total_non_rev: 0, total_liquido: total,
+    warnings, details, titular, isComprovante: true
+  };
+}
+
+function parseComprovante(text) {
+  // Universal comprovante parser: Asaas, Pix (Bradesco, Santander, BB, Itaú, etc.)
+  const entradas = {};
+  let total = 0;
+  const warnings = [];
+  const details = [];
+  let titular = '';
+
+  // --- Extract TITULAR (recebedor) ---
+  // Bradesco: "Dados de quem recebeu\nNome: FULANO"
+  let tm = text.match(/(?:quem\s+recebeu|recebedor)\s*(?:Para\s+)?(?:Nome\s*:\s*)?([A-ZÀ-Úa-zà-ú][A-ZÀ-Úa-zà-ú\s]+)/i);
+  // BB: "Recebedor\nFulano"
+  if (!tm) tm = text.match(/Recebedor\s+([A-ZÀ-Úa-zà-ú][A-ZÀ-Úa-zà-ú\s]+)/i);
+  if (tm) titular = tm[1].trim().replace(/\s+/g, ' ');
+  // Also try CNPJ/CPF
+  const cnpjMatch = text.match(/(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/);
+  if (cnpjMatch && titular) titular += ' (CNPJ ' + cnpjMatch[1] + ')';
+
+  // Strategy: find VALUE and DATE from the document
+
+  // --- Find VALUE ---
+  let valor = 0;
+  // 1. "Valor pago: R$ X" or "Valor pago R$ X" (Asaas, Santander)
+  let valMatch = text.match(/Valor\s+pago\s*:?\s*R\$\s*([\d.,]+)/i);
+  // 2. "Valor: R$ X" (Bradesco Pix)
+  if (!valMatch) valMatch = text.match(/Valor\s*:\s*R\$\s*([\d.,]+)/i);
+  // 3. "R$ X" right after "Pix Enviado" (BB)
+  if (!valMatch) valMatch = text.match(/Pix\s+Enviado\s*R\$\s*([\d.,]+)/i);
+  // 4. Just the first R$ value found
+  if (!valMatch) valMatch = text.match(/R\$\s*([\d.,]+)/i);
+
+  if (valMatch) {
+    valor = parseFloat(valMatch[1].replace(/\./g, '').replace(',', '.'));
+  }
+
+  // --- Find DATE ---
+  let dateStr = null, dd = '', mm = '', yyyy = '';
+  // 1. "Data da confirmação: DD/MM/YYYY" (Asaas)
+  let dateMatch = text.match(/Data\s+da\s+confirma[çc][ãa]o\s*:?\s*(\d{2})\/(\d{2})\/(\d{4})/i);
+  // 2. "Data e Hora: DD/MM/YYYY" (Bradesco, generic)
+  if (!dateMatch) dateMatch = text.match(/Data\s+e\s+Hora\s*:\s*(\d{2})\/(\d{2})\/(\d{4})/i);
+  // 3. "Data do débito: DD/MM/YYYY"
+  if (!dateMatch) dateMatch = text.match(/Data\s+do\s+d[ée]bito\s*:\s*(\d{2})\/(\d{2})\/(\d{4})/i);
+  // 4. Date at top of Santander format: "DD/MM/YYYY - HH:MM:SS"
+  if (!dateMatch) dateMatch = text.match(/(\d{2})\/(\d{2})\/(\d{4})\s*-\s*\d{2}:\d{2}/);
+  // 5. Fallback: first date found
+  if (!dateMatch) dateMatch = text.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+
+  if (dateMatch) {
+    dd = dateMatch[1]; mm = dateMatch[2]; yyyy = dateMatch[3];
+  }
+
+  if (valor > 0 && dd) {
+    const monthKey = `${yyyy}-${mm}`;
+    entradas[monthKey] = (entradas[monthKey] || 0) + valor;
+    total += valor;
+    details.push({ valor, data: `${dd}/${mm}/${yyyy}`, month: monthKey });
+  } else {
+    if (valor === 0) warnings.push('Valor não detectado no comprovante');
+    if (!dd) warnings.push('Data não detectada no comprovante');
+  }
+
+  return {
+    entradas, non_revenue: {}, liquido: { ...entradas },
+    total_bruto: total, total_non_rev: 0, total_liquido: total,
+    warnings, details, titular, isComprovante: true
+  };
+}
+
+function parseContrato(text) {
+  // Parse "Contrato de Prestação de Serviços": "valor de R$ X.XXX,XX" + contract date
+  const entradas = {};
+  let total = 0;
+  const warnings = [];
+  const details = [];
+
+  // Find value: "valor de R$ X.XXX,XX" — cross-line tolerant for pdf.js
+  let valor = 0;
+  // Clean trailing comma/period from value (some contracts have "R$3.060,00,")
+  let vm = text.match(/valor[\s\S]{0,10}de[\s\S]{0,10}R\$[\s]*([\d.,]+)/i);
+  if (!vm) vm = text.match(/valorde[\s]*R\$[\s]*([\d.,]+)/i);
+  if (!vm) vm = text.match(/pagar[áa][\s\S]*?R\$[\s]*([\d.,]+)/i);
+  if (!vm) vm = text.match(/honor[áa]rios[\s\S]*?R\$[\s]*([\d.,]+)/i);
+  if (!vm) vm = text.match(/mensalidade[\s\S]{0,30}R\$[\s]*([\d.,]+)/i);
+  // Last resort: first R$ value in the contract (skip if multiple R$ to avoid picking a penalty clause)
+  if (!vm) {
+    const allR$ = [...text.matchAll(/R\$[\s]*([\d.,]+)/gi)];
+    if (allR$.length === 1) vm = allR$[0];
+  }
+  if (vm) {
+    let valStr = vm[1].replace(/[,.]$/, ''); // remove trailing comma/period
+    valor = parseFloat(valStr.replace(/\./g, '').replace(',', '.'));
+  }
+
+  // Find contract date (most recent date, skip birth dates)
+  let monthKey = null;
+  const allDates = [...text.matchAll(/(\d{2})\/(\d{2})\/(\d{4})/g)];
+  // Filter to recent dates (>= 2024)
+  const recentDates = allDates.filter(m => parseInt(m[3]) >= 2024);
+  if (recentDates.length > 0) {
+    // Use first recent date (usually contract/signing date)
+    const d = recentDates[0];
+    monthKey = `${d[3]}-${d[2]}`;
+    details.push({ valor, data: `${d[1]}/${d[2]}/${d[3]}`, month: monthKey });
+  }
+
+  if (valor > 0 && monthKey) {
+    entradas[monthKey] = (entradas[monthKey] || 0) + valor;
+    total = valor;
+  } else {
+    if (valor === 0) warnings.push('Valor não encontrado no contrato');
+    if (!monthKey) warnings.push('Data não encontrada no contrato');
+  }
+
+  return {
+    entradas, non_revenue: {}, liquido: { ...entradas },
+    total_bruto: total, total_non_rev: 0, total_liquido: total,
+    warnings, details, isComprovante: true
+  };
+}
+
+function parseFilename(filename) {
+  // Fallback: extract value and month from filename when OCR/text extraction fails.
+  // Patterns like: "885,00 NOV.jpeg", "1.615,00 AGOSTO.pdf", "1800 FEV.jpeg"
+  const FNAME_MONTHS = {
+    'JAN':'01','JANEIRO':'01','FEV':'02','FEVEREIRO':'02','MAR':'03','MARCO':'03',
+    'ABR':'04','ABRIL':'04','MAI':'05','MAIO':'05','JUN':'06','JUNHO':'06',
+    'JUL':'07','JULHO':'07','AGO':'08','AGOSTO':'08','SET':'09','SETEMBRO':'09',
+    'OUT':'10','OUTUBRO':'10','NOV':'11','NOVEMBRO':'11','DEZ':'12','DEZEMBRO':'12'
+  };
+  const monthPattern = Object.keys(FNAME_MONTHS).join('|');
+  const base = filename.replace(/\.(pdf|jpeg|jpg|png)$/i, '');
+
+  const m = base.match(new RegExp(`([\\d.]+(?:,\\d+)?)\\s+(${monthPattern})(?:\\s|$)`, 'i'));
+  if (!m) return null;
+
+  const valStr = m[1];
+  const monthName = m[2].toUpperCase();
+  const valor = parseFloat(valStr.replace(/\./g, '').replace(',', '.'));
+  if (isNaN(valor) || valor <= 0) return null;
+
+  const mm = FNAME_MONTHS[monthName];
+  const paymentMonth = parseInt(mm);
+
+  // Infer year: find a date in the filename (YYYY-MM-DD or DD-MM-YYYY)
+  let year = null;
+  const ymd = filename.match(/(\d{4})-(\d{2})-\d{2}/); // WhatsApp: YYYY-MM-DD
+  if (ymd) {
+    const fileYear = parseInt(ymd[1]);
+    const fileMonth = parseInt(ymd[2]);
+    // If payment month > file month, payment was previous year
+    year = paymentMonth > fileMonth ? fileYear - 1 : fileYear;
+  }
+  if (!year) {
+    const dmy = filename.match(/\d{2}-(\d{2})-(\d{4})/); // Sicoob: DD-MM-YYYY
+    if (dmy) {
+      const fileYear = parseInt(dmy[2]);
+      const fileMonth = parseInt(dmy[1]);
+      year = paymentMonth > fileMonth ? fileYear - 1 : fileYear;
+    }
+  }
+  if (!year) year = new Date().getFullYear(); // last resort
+
+  const monthKey = `${year}-${mm}`;
+  return {
+    entradas: { [monthKey]: valor },
+    non_revenue: {},
+    liquido: { [monthKey]: valor },
+    total_bruto: valor,
+    total_non_rev: 0,
+    total_liquido: valor,
+    warnings: [`Valor extraído do nome do arquivo (R$ ${valor.toLocaleString('pt-BR',{minimumFractionDigits:2})} em ${monthName}/${year})`],
+    details: [{ valor, data: `${monthName}/${year}`, month: monthKey }],
+    isComprovante: true,
+    fromFilename: true
+  };
+}
+
+function parsePagBank(text) {
+  const entradas = {};
+  const details = [];
+  let total_bruto = 0;
+  let titular = '';
+
+  // Extract titular: first non-empty line is usually the name, then CNPJ on next
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+  if (lines.length) titular = lines[0];
+  const cnpjMatch = text.match(/CNPJ\s*:\s*(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/);
+  if (cnpjMatch) titular = (titular ? titular + ' ' : '') + '(CNPJ ' + cnpjMatch[1] + ')';
+
+  // Remove "Valor Líquido do dia" subtotals to avoid double-counting
+  const cleaned = text.replace(/Valor\s+L[ií]quido\s+do\s+dia[:\s]*R\$\s*[\d.,]+/gi, '');
+
+  // Find all transaction dates and their positions
+  const dateRegex = /(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}:\d{2})/g;
+  const dates = [];
+  let m;
+  while ((m = dateRegex.exec(cleaned)) !== null) {
+    dates.push({ idx: m.index, dd: m[1], mm: m[2], yyyy: m[3], time: m[4] });
+  }
+
+  for (let i = 0; i < dates.length; i++) {
+    const d = dates[i];
+    const start = d.idx;
+    const end = i + 1 < dates.length ? dates[i + 1].idx : cleaned.length;
+    const chunk = cleaned.substring(start, end);
+
+    // Find all R$ values in this chunk
+    const vals = [...chunk.matchAll(/R\$\s*([\d.,]+)/g)].map(v =>
+      parseFloat(v[1].replace(/\./g, '').replace(',', '.'))
+    ).filter(v => !isNaN(v) && v > 0);
+
+    // Need at least 3 values: bruto, taxa, líquido
+    if (vals.length < 3) continue;
+
+    // Check "Aprovada" to confirm it's a real transaction
+    if (!/Aprovada/i.test(chunk)) continue;
+
+    const bruto = vals[vals.length - 3];
+    const taxa = vals[vals.length - 2];
+    const liq = vals[vals.length - 1];
+    const monthKey = `${d.yyyy}-${d.mm}`;
+
+    entradas[monthKey] = (entradas[monthKey] || 0) + bruto;
+    total_bruto += bruto;
+    details.push({ valor: bruto, taxa, liquido: liq, data: `${d.dd}/${d.mm}/${d.yyyy}`, month: monthKey });
+  }
+
+  const warnings = [];
+  if (details.length === 0) warnings.push('Nenhuma transação PagBank detectada');
+
+  return {
+    entradas, non_revenue: {}, liquido: { ...entradas },
+    total_bruto, total_non_rev: 0, total_liquido: total_bruto,
+    warnings, details, titular
+  };
+}
+
+function parseGeneric(text, filename) {
+  // ===== UNIVERSAL BANK STATEMENT PARSER v3 =====
+  // Philosophy: be AGGRESSIVE about finding credits. Better to find too much
+  // (user can review) than to miss entries and show "não lido".
+  const entradas = {};
+  const non_revenue = {};
+  const warnings = [];
+
+  const MESES_NOME = {
+    'jan':'01','fev':'02','mar':'03','abr':'04','mai':'05','jun':'06',
+    'jul':'07','ago':'08','set':'09','out':'10','nov':'11','dez':'12',
+    'janeiro':'01','fevereiro':'02','marco':'03','março':'03',
+    'abril':'04','maio':'05','junho':'06','julho':'07','agosto':'08',
+    'setembro':'09','outubro':'10','novembro':'11','dezembro':'12'
+  };
+
+  // ── Strategy 1: Summary totals ──
+  // Look for "Total de entradas", "Total de créditos", "Total creditado", etc.
+  const summaryPatterns = [
+    /Total\s+de\s+entradas\s*[:\s+]?\s*R?\$?\s*\+?\s*([\d.,]+)/i,
+    /Total\s+(?:de\s+)?cr[ée]ditos?\s*[:\s]?\s*R?\$?\s*([\d.,]+)/i,
+    /Total\s+creditado\s*[:\s]?\s*R?\$?\s*([\d.,]+)/i,
+    /Total\s+(?:de\s+)?recebimentos?\s*[:\s]?\s*R?\$?\s*([\d.,]+)/i,
+    /Entradas\s*[:\s]\s*R?\$?\s*([\d.,]+)/i
+  ];
+  for (const pat of summaryPatterns) {
+    const m = text.match(pat);
+    if (m) {
+      const totalVal = parseFloat(m[1].replace(/\./g, '').replace(',', '.'));
+      const monthKey = findFirstMonth(text);
+      if (monthKey && totalVal > 0) {
+        entradas[monthKey] = totalVal;
+        checkNonRevenue(text, monthKey, non_revenue);
+        return buildResult(entradas, non_revenue, warnings);
+      }
+    }
+  }
+
+  // ── Strategy 2: Line-by-line transaction parsing ──
+  // Three passes with decreasing strictness:
+  //   Pass A: lines with explicit credit keywords
+  //   Pass B: lines with "C" marker or "+" prefix (common in BR bank statements)
+  //   Pass C: lines with date + value that are NOT debits (most permissive)
+  let currentMonth = null;
+  const lines = text.split('\n');
+
+  const SKIP_LINE = /SALDO\s+(ANTERIOR|ATUAL|FINAL|INICI|do\s+dia|em\s|total|dispon|bloque|da\s+conta)|Limite|Taxa\s+de\s+juros|Vencimento|CET.*Anual|IOF|Tarifas\s+Pend|CPMF|Juros\s+(Cheque|adiant)|cheque\s+especial|Fale\s+com|SAC:|Ouvidoria:|0800|Saldo\s+(disponível|bloqueado|de\s+investimento)|Per[ií]odo\s*:|Categorias:|Solicitado\s+em|Central\s+de\s+(Ajuda|Relacionamento)|P[áa]gina\s+\d|bloqueado\s*\+\s*dispon|N[ãa]o\s+h[áa]\s+linhas|Valores\s+sujeitos|opera[çc][õo]es\s+de\s+cr[ée]dito|EXTRATO\s+DE\s+CONTA|COOPERATIVA|CLIENTE:|USU[ÁA]RIO:|CONTA:/i;
+
+  const CREDIT_KEYWORDS = /Pix\s+recebido|RECEBIMENTO|PIX_CRED|CRED\s*DOM|CR[ÉE]DITO|Dep[óo]sito\s+(?:de\s+)?vendas|Dep[óo]sito\s+InfinitePay|Vendas\s+Dep|Transfer[êe]ncia\s+recebida|TED\s+recebida|TED\s+CRED|DOC\s+recebido|Resgate|REND\s+POUP|Devolu[çc][ãa]o/i;
+
+  const DEBIT_KEYWORDS = /PAGAMENTO|PAG\s+TIT|PIX_DEB|Pix\s+enviado|Enviado|D[ÉE]BITO|Transfer[êe]ncia\s+enviada|LIQUIDACAO|INTEGR\s+PARC|CUSTO\s+ALUGUEL|PJ\s+CONTA|TARIFA|TAR\s+|IOF\s|IMPOSTO|IR\s+S\/|CPMF|DEB\s+|Compra\s+no|COMPRA\s/i;
+
+  // Pass A+B+C combined in single loop for efficiency
+  for (const line of lines) {
+    const monthFromLine = extractMonthFromLine(line);
+    if (monthFromLine) currentMonth = monthFromLine;
+    if (!currentMonth) continue;
+    if (SKIP_LINE.test(line)) continue;
+    // Skip short lines (headers, footers)
+    if (line.trim().length < 8) continue;
+
+    const hasCredit = CREDIT_KEYWORDS.test(line);
+    const hasDebit = DEBIT_KEYWORDS.test(line);
+
+    // Skip confirmed debits (unless also has credit keyword)
+    if (hasDebit && !hasCredit) continue;
+
+    // Check for explicit negative value → debit
+    if (/\s-\s*\d/.test(line) || /\s-[\d.,]+\s/.test(line)) {
+      if (!hasCredit) continue;
+    }
+
+    // Check for "C" or "D" markers at end of value (Santander/Bradesco style: "1.234,56 C")
+    const hasCMarker = /[\d.,]+\s+C\b/i.test(line);
+    const hasDMarker = /[\d.,]+\s+D\b/i.test(line);
+    if (hasDMarker && !hasCredit && !hasCMarker) continue;
+
+    // Determine if this line is a credit
+    const isCredit = hasCredit || hasCMarker || /\+[\d.,]/.test(line);
+
+    // For lines without any credit/debit indicator: need a date on this line
+    if (!isCredit && !hasDebit) {
+      // Only accept if line itself has a date (not just inherited currentMonth)
+      if (!monthFromLine) continue;
+      // And has a monetary value
+      if (!/[\d.]+,\d{2}/.test(line) && !/R\$/.test(line)) continue;
+    }
+
+    // ── Extract monetary value ──
+    let val = 0;
+
+    // Method 1: R$ X.XXX,XX
+    let vm = line.match(/R\$\s*([\d.,]+)/);
+    // Method 2: +X.XXX,XX
+    if (!vm) vm = line.match(/\+([\d.]+,\d{2})/);
+    // Method 3: Value with C marker (e.g., "1.234,56 C")
+    if (!vm && hasCMarker) {
+      const cm = line.match(/([\d.]+,\d{2})\s+C\b/i);
+      if (cm) vm = cm;
+    }
+    // Method 4: Second-to-last value (transaction value before running saldo)
+    if (!vm) {
+      const allVals = [...line.matchAll(/([\d.]+,\d{2})/g)];
+      if (allVals.length >= 2) {
+        vm = [null, allVals[allVals.length - 2][1]];
+      } else if (allVals.length === 1 && isCredit) {
+        vm = [null, allVals[0][1]];
+      }
+    }
+
+    if (vm) {
+      const valStr = vm[1].replace(/[,.]$/, '');
+      val = parseFloat(valStr.replace(/\./g, '').replace(',', '.'));
+    }
+
+    if (val > 0 && val < 50000000) {
+      entradas[currentMonth] = (entradas[currentMonth] || 0) + val;
+      for (const p of NON_REVENUE_PATTERNS) {
+        if (line.includes(p)) {
+          non_revenue[currentMonth] = (non_revenue[currentMonth] || 0) + val;
+          break;
+        }
+      }
+    }
+  }
+
+  // ── Strategy 3: Filename-based month + sum all R$ in document ──
+  if (Object.keys(entradas).length === 0) {
+    const monthKey = findFirstMonth(text);
+    if (monthKey) {
+      // Sum all R$ values, excluding obvious saldo/summary lines
+      let sum = 0;
+      let count = 0;
+      for (const line of lines) {
+        if (SKIP_LINE.test(line)) continue;
+        const rMatches = [...line.matchAll(/R\$\s*([\d.,]+)/g)];
+        for (const rm of rMatches) {
+          const v = parseFloat(rm[1].replace(/\./g, '').replace(',', '.'));
+          if (v > 0 && v < 1000000) { sum += v; count++; }
+        }
+      }
+      if (sum > 0 && count <= 500) {
+        entradas[monthKey] = sum;
+        warnings.push('Soma de todos os R$ do documento — revise manualmente');
+      }
+    }
+  }
+
+  if (Object.keys(entradas).length === 0) {
+    warnings.push('Nenhuma entrada encontrada — adicione manualmente');
+  }
+
+  return buildResult(entradas, non_revenue, warnings);
+
+  // ── Helpers ──
+  function monthFromFilename(fn) {
+    if (!fn) return null;
+    // "Extrato janeiro 2025.pdf" or "Extratoagosto2025.pdf"
+    const base = fn.replace(/\.(pdf|jpg|jpeg|png)$/i, '');
+    for (const [name, num] of Object.entries(MESES_NOME)) {
+      if (name.length < 3) continue; // skip 3-letter abbreviations that might false-match
+      const re = new RegExp(name + '\\s*(\\d{4})', 'i');
+      const m = base.match(re);
+      if (m) return `${m[1]}-${num}`;
+    }
+    // Also try "Extrato 01-2025" or "Extrato 01_2025"
+    const numMatch = base.match(/(\d{2})[\s_-]*(20\d{2})/);
+    if (numMatch) return `${numMatch[2]}-${numMatch[1]}`;
+    return null;
+  }
+
+  function findFirstMonth(txt) {
+    // DD/MM/YYYY
+    let m = txt.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    if (m && parseInt(m[3]) >= 2020) return `${m[3]}-${m[2]}`;
+    // "D de Month de YYYY"
+    m = txt.match(/\d{1,2}\s+de\s+(\w+)\s+de\s+(\d{4})/i);
+    if (m) { const mm = MESES_NOME[m[1].toLowerCase()]; if (mm) return `${m[2]}-${mm}`; }
+    // "DD Mmm, YYYY"
+    m = txt.match(/\d{1,2}\s+(Jan|Fev|Mar|Abr|Mai|Jun|Jul|Ago|Set|Out|Nov|Dez)\w*,?\s+(\d{4})/i);
+    if (m) { const mm = MESES_NOME[m[1].toLowerCase().substring(0,3)]; if (mm) return `${m[2]}-${mm}`; }
+    // Filename fallback
+    return monthFromFilename(filename);
+  }
+
+  function findYearContext() {
+    // Find a plausible year from the document text
+    const ym = text.match(/(202\d)/);
+    if (ym) return ym[1];
+    // Try filename
+    const fm = monthFromFilename(filename);
+    if (fm) return fm.substring(0, 4);
+    return '2025';
+  }
+
+  function extractMonthFromLine(line) {
+    // DD/MM/YYYY
+    let m = line.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    if (m && parseInt(m[3]) >= 2020) return `${m[3]}-${m[2]}`;
+    // DD/MM without year (common in bank statements like Santander)
+    m = line.match(/^(\d{2})\/(\d{2})\s/);
+    if (m) {
+      const year = findYearContext();
+      return `${year}-${m[2]}`;
+    }
+    // "D de Month de YYYY"
+    m = line.match(/(\d{1,2})\s+de\s+(\w+)\s+de\s+(\d{4})/i);
+    if (m) { const mm = MESES_NOME[m[2].toLowerCase()]; if (mm && parseInt(m[3]) >= 2020) return `${m[3]}-${mm}`; }
+    // "DD Mmm, YYYY"
+    m = line.match(/(\d{1,2})\s+(Jan|Fev|Mar|Abr|Mai|Jun|Jul|Ago|Set|Out|Nov|Dez)\w*,?\s+(\d{4})/i);
+    if (m) { const mm = MESES_NOME[m[2].toLowerCase().substring(0,3)]; if (mm && parseInt(m[3]) >= 2020) return `${m[3]}-${mm}`; }
+    return null;
+  }
+
+  function checkNonRevenue(txt, monthKey, nonRev) {
+    for (const line of txt.split('\n')) {
+      for (const p of NON_REVENUE_PATTERNS) {
+        if (line.includes(p)) {
+          const vm = line.match(/R\$\s*([\d.,]+)/) || line.match(/\+?\s*([\d.,]+)\s*$/);
+          if (vm) {
+            const v = parseFloat(vm[1].replace(/\./g, '').replace(',', '.'));
+            nonRev[monthKey] = (nonRev[monthKey] || 0) + v;
+          }
+        }
+      }
+    }
+  }
+
+  function buildResult(ent, nonRev, warns) {
+    const liquido = {};
+    let total_bruto = 0, total_non_rev = 0;
+    for (const m of Object.keys(ent)) {
+      const nr = nonRev[m] || 0;
+      liquido[m] = ent[m] - nr;
+      total_bruto += ent[m];
+      total_non_rev += nr;
+    }
+    return { entradas: ent, non_revenue: nonRev, liquido, total_bruto, total_non_rev, total_liquido: total_bruto - total_non_rev, warnings: warns };
+  }
+}
+
+// ========== MODAL: PDF REVIEW ==========
+let currentPDFEmail = null;
+let currentPDFResult = null;
+
+function openPDFUploadForAluno(email) {
+  currentPDFEmail = email;
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.pdf,.jpg,.jpeg,.png';
+  input.multiple = true;
+  input.onchange = async (e) => {
+    const files = [...e.target.files];
+    if (!files.length) return;
+    toast(`Processando ${files.length} arquivo(s)...`);
+
+    // Process ALL files first, then decide how to present
+    const results = [];
+    const errors = [];
+    for (let fi = 0; fi < files.length; fi++) {
+      const file = files[fi];
+      try {
+        toast(`Processando ${fi + 1}/${files.length}: ${file.name}${file.type.startsWith('image/') ? ' (OCR)' : ''}...`);
+        let text;
+        if (file.type.startsWith('image/') || /\.(jpg|jpeg|png)$/i.test(file.name)) {
+          text = await extractImageText(file);
+        } else {
+          text = await extractPDFText(file);
+        }
+        let result = detectBankAndParse(text, file.name);
+        result.filename = file.name;
+        // If no data from content, try parsing the filename as fallback
+        if (result.total_liquido === 0 && (!result.details || result.details.length === 0)) {
+          const fnResult = parseFilename(file.name);
+          if (fnResult) {
+            fnResult.filename = file.name;
+            fnResult.banco = result.banco !== 'Desconhecido' ? result.banco : 'Arquivo';
+            result = fnResult;
+          } else {
+            result._noData = true;
+          }
+        }
+        results.push(result);
+      } catch (err) {
+        console.error('Erro ao processar arquivo:', err, file.name);
+        errors.push(file.name);
+      }
+    }
+
+    if (errors.length) toast(`Erro em ${errors.length} arquivo(s): ${errors.join(', ')}`);
+    if (!results.length) { toast('Nenhum arquivo processado com sucesso.'); return; }
+
+    // If single file OR single bank statement → show as-is
+    if (results.length === 1) {
+      currentPDFResult = results[0];
+      currentPDFEmail = email;
+      showPDFReviewModal(email, results[0]);
+      return;
+    }
+
+    // Multiple files: aggregate into one combined result
+    const combined = aggregateResults(results);
+    currentPDFResult = combined;
+    currentPDFEmail = email;
+    showPDFReviewModal(email, combined);
+  };
+  input.click();
+}
+
+function aggregateResults(results) {
+  const meses = {};
+  const non_revenue = {};
+  const allDetails = [];
+  const allWarnings = [];
+  const filenames = [];
+  const failedFiles = [];
+  const titulares = new Set();
+  let total_bruto = 0, total_non_rev = 0;
+  const bancos = new Set();
+
+  // Dedup: track seen (value, date) pairs to skip duplicates within this batch
+  const seenEntries = new Set();
+  let dupCount = 0;
+  const dupFiles = [];
+
+  for (const r of results) {
+    filenames.push(r.filename || '?');
+    bancos.add(r.banco);
+    if (r.titular) titulares.add(r.titular);
+
+    // Track files with no data
+    if (r._noData) {
+      failedFiles.push(r.filename || '?');
+      continue;
+    }
+
+    // Check for duplicate: same details (value + date) already seen
+    if (r.details && r.details.length > 0) {
+      const entryKey = r.details.map(d => `${d.valor}|${d.data || d.month}`).sort().join(';');
+      if (seenEntries.has(entryKey)) {
+        dupCount++;
+        dupFiles.push(r.filename || '?');
+        continue; // Skip this duplicate
+      }
+      seenEntries.add(entryKey);
+    }
+
+    for (const [m, v] of Object.entries(r.meses || {})) {
+      meses[m] = (meses[m] || 0) + v;
+    }
+    for (const [m, v] of Object.entries(r.non_revenue || {})) {
+      non_revenue[m] = (non_revenue[m] || 0) + v;
+    }
+    total_bruto += r.total_bruto || 0;
+    total_non_rev += r.total_non_rev || 0;
+
+    if (r.details) allDetails.push(...r.details);
+    if (r.warnings) {
+      for (const w of r.warnings) {
+        if (!allWarnings.includes(w)) allWarnings.push(w);
+      }
+    }
+  }
+
+  // Add warnings for duplicates and failed files
+  if (dupCount > 0) {
+    allWarnings.unshift(`${dupCount} arquivo(s) duplicado(s) ignorado(s): ${dupFiles.join(', ')}`);
+  }
+  if (failedFiles.length > 0) {
+    allWarnings.unshift(`${failedFiles.length} arquivo(s) não lido(s) — adicione manualmente: ${failedFiles.join(', ')}`);
+  }
+
+  // Compute líquido
+  const meses_liquido = {};
+  const allMonths = new Set([...Object.keys(meses), ...Object.keys(non_revenue)]);
+  for (const m of allMonths) {
+    meses_liquido[m] = (meses[m] || 0) - (non_revenue[m] || 0);
+  }
+
+  const banco = bancos.size === 1 ? [...bancos][0] : [...bancos].join(' + ');
+
+  // Build period from all months
+  const sortedMonths = [...allMonths].sort();
+  const monthNames = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  let periodo = '';
+  if (sortedMonths.length) {
+    const first = sortedMonths[0].split('-');
+    const last = sortedMonths[sortedMonths.length - 1].split('-');
+    periodo = `${monthNames[parseInt(first[1])]}/${first[0]}`;
+    if (sortedMonths.length > 1) periodo += ` a ${monthNames[parseInt(last[1])]}/${last[0]}`;
+  }
+
+  // Combine titulares
+  const titular = [...titulares].filter(t => t).join(' / ');
+
+  return {
+    banco, periodo, titular,
+    meses, non_revenue, meses_liquido,
+    total_bruto, total_non_rev,
+    total_liquido: total_bruto - total_non_rev,
+    warnings: allWarnings,
+    details: allDetails,
+    isComprovante: results.some(r => r.isComprovante),
+    filename: `${results.length} arquivos (${filenames.join(', ')})`,
+    _files: filenames
+  };
+}
+
+function showPDFReviewModal(email, result) {
+  const aluno = STATE.summit.find(p => p.email === email);
+  const nome = aluno ? aluno.nome : email;
+  const months = Object.keys(result.meses_liquido).sort();
+
+  const fmtBRL = v => `R$ ${v.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}`;
+
+  let warningHTML = '';
+  if (result.warnings.length) {
+    warningHTML = result.warnings.map(w => {
+      const isFailedFile = w.includes('não lido');
+      return `<div class="pdf-status warn" style="${isFailedFile ? 'background:rgba(239,68,68,.2);border:1px solid var(--red);color:var(--red);font-weight:600' : ''}">⚠ ${w}</div>`;
+    }).join('');
+  }
+
+  let monthsHTML = '';
+  if (months.length > 0) {
+    monthsHTML = `<div class="month-input-grid">` +
+      months.map(m => {
+        const bruto = result.meses[m] || 0;
+        const nr = result.non_revenue[m] || 0;
+        const liq = result.meses_liquido[m] || 0;
+        const [year, mm] = m.split('-');
+        const monthNames = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+        const label = `${monthNames[parseInt(mm)]}/${year}`;
+        return `<div class="month-input-item">
+          <label>${label}${nr > 0 ? ` <span style="color:var(--red);font-size:9px">-${fmtBRL(nr)} NR</span>` : ''}</label>
+          <input type="number" step="0.01" value="${liq.toFixed(2)}" data-month="${m}" data-bruto="${bruto}" data-nr="${nr}">
+          <div style="font-size:9px;color:var(--text3);margin-top:2px">Bruto: ${fmtBRL(bruto)}</div>
+        </div>`;
+      }).join('') + `</div>`;
+  } else {
+    monthsHTML = `<div class="pdf-status warn">⚠ Nenhum mês detectado automaticamente. Adicione manualmente abaixo.</div>`;
+  }
+
+  const html = `<div class="modal-overlay" id="pdf-modal" onclick="if(event.target===this)closePDFModal()">
+    <div class="modal">
+      <button class="close-btn" onclick="closePDFModal()">&times;</button>
+      <h2>📄 Extrato: ${nome}</h2>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:12px">${email}</div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:12px 0">
+        <div style="background:var(--bg);padding:10px;border-radius:8px;text-align:center">
+          <div style="font-size:11px;color:var(--text3)">Banco</div>
+          <div style="font-size:16px;font-weight:700;color:var(--accent2)">${result.banco}</div>
+        </div>
+        <div style="background:var(--bg);padding:10px;border-radius:8px;text-align:center">
+          <div style="font-size:11px;color:var(--text3)">Arquivo</div>
+          <div style="font-size:12px;color:var(--text)">${result.filename}</div>
+        </div>
+        <div style="background:var(--bg);padding:10px;border-radius:8px;text-align:center">
+          <div style="font-size:11px;color:var(--text3)">Período</div>
+          <div style="font-size:12px;color:var(--text)">${result.periodo || '—'}</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
+        <div style="background:var(--bg);padding:10px;border-radius:8px;text-align:center">
+          <div style="font-size:11px;color:var(--text3)">Entradas Brutas</div>
+          <div style="font-size:16px;font-weight:700">${fmtBRL(result.total_bruto)}</div>
+        </div>
+        <div style="background:var(--bg);padding:10px;border-radius:8px;text-align:center">
+          <div style="font-size:11px;color:var(--text3)">Não-Receita</div>
+          <div style="font-size:16px;font-weight:700;color:var(--red)">- ${fmtBRL(result.total_non_rev)}</div>
+        </div>
+        <div style="background:var(--bg);padding:10px;border-radius:8px;text-align:center">
+          <div style="font-size:11px;color:var(--text3)">Faturamento</div>
+          <div style="font-size:16px;font-weight:700;color:var(--green)">${fmtBRL(result.total_liquido)}</div>
+        </div>
+      </div>
+
+      ${warningHTML}
+
+      ${result.details && result.details.length > 0 ? `
+      <div style="margin-bottom:12px">
+        <h3 style="margin-bottom:6px">${result.isComprovante ? 'Comprovantes' : 'Transações'} Detectadas (${result.details.length})</h3>
+        <div style="max-height:150px;overflow-y:auto;background:var(--bg);border-radius:8px;padding:8px">
+          <table style="width:100%;font-size:11px">
+            <tr style="color:var(--text3)"><th style="text-align:left;padding:2px 6px">Data</th><th style="text-align:right;padding:2px 6px">Valor Bruto</th>${result.details[0]?.taxa !== undefined ? '<th style="text-align:right;padding:2px 6px">Taxa</th>' : ''}</tr>
+            ${result.details.map(d => `<tr><td style="padding:2px 6px">${d.data}</td><td style="text-align:right;padding:2px 6px;color:var(--green)">R$ ${d.valor.toLocaleString('pt-BR',{minimumFractionDigits:2})}</td>${d.taxa !== undefined ? `<td style="text-align:right;padding:2px 6px;color:var(--red)">R$ ${d.taxa.toLocaleString('pt-BR',{minimumFractionDigits:2})}</td>` : ''}</tr>`).join('')}
+          </table>
+        </div>
+      </div>` : ''}
+
+      <h3>Faturamento Mensal (editável)</h3>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:8px">${result.isComprovante ? 'Valores dos comprovantes agrupados por mês. Ajuste se necessário.' : result.banco === 'PagBank' ? 'Valor bruto das vendas (faturamento). Taxa PagBank não é deduzida. Ajuste se necessário.' : 'Valores líquidos após exclusão de Resgate RDB, Estorno, Crédito em conta. Ajuste se necessário.'}</div>
+      ${monthsHTML}
+
+      <div style="margin-top:12px">
+        <button onclick="addManualMonth()" style="padding:6px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-size:12px;cursor:pointer">+ Adicionar mês manualmente</button>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closePDFModal()">Cancelar</button>
+        <button class="btn-primary" onclick="confirmPDFExtrato()">✓ Confirmar e Salvar</button>
+      </div>
+    </div>
+  </div>`;
+
+  // Remove existing modal if any
+  const existing = document.getElementById('pdf-modal');
+  if (existing) existing.remove();
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function addManualMonth() {
+  const grid = document.querySelector('.month-input-grid');
+  if (!grid) {
+    // Create the grid if it doesn't exist (no months detected)
+    const container = document.querySelector('.modal h3:last-of-type');
+    if (container) {
+      const warn = container.nextElementSibling?.nextElementSibling;
+      if (warn && warn.classList.contains('pdf-status')) warn.remove();
+      const newGrid = document.createElement('div');
+      newGrid.className = 'month-input-grid';
+      container.parentElement.insertBefore(newGrid, container.nextElementSibling?.nextElementSibling);
+    }
+    return addManualMonth();
+  }
+  const now = new Date();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const yyyy = now.getFullYear();
+  const div = document.createElement('div');
+  div.className = 'month-input-item';
+  div.innerHTML = `
+    <label><input type="text" value="${yyyy}-${mm}" style="width:80px;text-align:left;font-size:11px;padding:2px 4px" data-month-key> <span style="cursor:pointer;color:var(--red);font-size:14px" onclick="this.closest('.month-input-item').remove()">×</span></label>
+    <input type="number" step="0.01" value="0" data-month="" data-bruto="0" data-nr="0">
+    <div style="font-size:9px;color:var(--text3);margin-top:2px">Manual</div>
+  `;
+  // Update data-month on key input change
+  const keyInput = div.querySelector('[data-month-key]');
+  const valInput = div.querySelector('[data-month]');
+  keyInput.addEventListener('input', () => { valInput.dataset.month = keyInput.value; });
+  valInput.dataset.month = `${yyyy}-${mm}`;
+  grid.appendChild(div);
+}
+
+function closePDFModal() {
+  const modal = document.getElementById('pdf-modal');
+  if (modal) modal.remove();
+  currentPDFResult = null;
+}
+
+function confirmPDFExtrato() {
+  const email = currentPDFEmail;
+  const result = currentPDFResult;
+  if (!email || !result) return;
+
+  // Read edited values from modal
+  const inputs = document.querySelectorAll('#pdf-modal .month-input-grid input[data-month]');
+  const meses = {};
+  inputs.forEach(inp => {
+    const month = inp.dataset.month || inp.closest('.month-input-item')?.querySelector('[data-month-key]')?.value;
+    if (!month) return;
+    const val = parseFloat(inp.value) || 0;
+    if (val > 0) meses[month] = val;
+  });
+
+  if (Object.keys(meses).length === 0) {
+    toast('Nenhum mês com valor > 0');
+    return;
+  }
+
+  // Initialize plaquinha entry if needed
+  if (!STATE.plaquinhas[email]) {
+    const aluno = STATE.summit.find(p => p.email === email);
+    STATE.plaquinhas[email] = {
+      nome: aluno ? aluno.nome : '',
+      extratos: []
+    };
+  }
+  const plaq = STATE.plaquinhas[email];
+  if (!plaq.extratos) plaq.extratos = [];
+
+  // Check for duplicates against existing extratos
+  const newKey = Object.entries(meses).map(([m,v]) => `${m}:${v.toFixed(2)}`).sort().join('|');
+  const isDuplicate = plaq.extratos.some(ext => {
+    if (!ext.meses) return false;
+    const extKey = Object.entries(ext.meses).map(([m,v]) => `${m}:${parseFloat(v).toFixed(2)}`).sort().join('|');
+    return extKey === newKey;
+  });
+
+  if (isDuplicate) {
+    if (!confirm('⚠ Este extrato parece ser DUPLICADO (mesmos meses e valores já salvos).\n\nDeseja salvar mesmo assim?')) {
+      return;
+    }
+  }
+
+  // Check for partial overlap (same months with different values)
+  const existingMonths = {};
+  plaq.extratos.forEach(ext => {
+    if (!ext.meses) return;
+    for (const [m, v] of Object.entries(ext.meses)) {
+      existingMonths[m] = (existingMonths[m] || 0) + parseFloat(v);
+    }
+  });
+  const overlappingMonths = Object.keys(meses).filter(m => existingMonths[m]);
+  if (overlappingMonths.length > 0 && !isDuplicate) {
+    const monthNames = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    const overlapDesc = overlappingMonths.map(m => {
+      const [y, mm] = m.split('-');
+      return `${monthNames[parseInt(mm)]}/${y} (existente: R$ ${existingMonths[m].toLocaleString('pt-BR',{minimumFractionDigits:2})}, novo: R$ ${meses[m].toLocaleString('pt-BR',{minimumFractionDigits:2})})`;
+    }).join('\n');
+    if (!confirm(`⚠ Meses já existentes serão SOMADOS:\n\n${overlapDesc}\n\nOs valores serão acumulados. Continuar?`)) {
+      return;
+    }
+  }
+
+  // Add this extrato
+  plaq.extratos.push({
+    id: Date.now(),
+    filename: result.filename,
+    banco: result.banco,
+    periodo: result.periodo,
+    meses: meses
+  });
+
+  // Recalc this aluno
+  recalcAlunoPlaquinhas(email);
+  saveState();
+  closePDFModal();
+  toast(`Extrato salvo para ${plaq.nome || email}`);
+  renderAll();
+}
+
+function removeExtrato(email, extratoId) {
+  const plaq = STATE.plaquinhas[email];
+  if (!plaq || !plaq.extratos) return;
+  plaq.extratos = plaq.extratos.filter(e => e.id !== extratoId);
+  if (plaq.extratos.length === 0) {
+    delete STATE.plaquinhas[email];
+  } else {
+    recalcAlunoPlaquinhas(email);
+  }
+  saveState();
+  renderAll();
+}
+
+function recalcAlunoPlaquinhas(email) {
+  const plaq = STATE.plaquinhas[email];
+  if (!plaq) return;
+  if (!plaq.extratos || plaq.extratos.length === 0) return;
+
+  // Consolidar meses de todos os extratos
+  const mesesConsolidado = {};
+  plaq.extratos.forEach(ext => {
+    if (!ext.meses) return;
+    for (const [m, v] of Object.entries(ext.meses)) {
+      mesesConsolidado[m] = (mesesConsolidado[m] || 0) + v;
+    }
+  });
+
+  plaq.meses = mesesConsolidado;
+  const monthValues = Object.values(mesesConsolidado);
+  plaq.fat_total = monthValues.reduce((s, v) => s + v, 0);
+  plaq.fat_maior_mes = monthValues.length ? Math.max(...monthValues) : 0;
+
+  const ptier = classifyPlaquinhaTotal(plaq.fat_total);
+  plaq.plaq_total = ptier ? ptier.label : '—';
+
+  const mensaisAcumulo = classifyPlaquinhasMensaisAcumulo(mesesConsolidado);
+  plaq.plaq_mensais = mensaisAcumulo;
+  plaq.plaq_mensal_labels = mensaisAcumulo.map(m => m.tier.label);
+  plaq.plaq_mensal = mensaisAcumulo.length ? mensaisAcumulo[0].tier.label : '—';
+  plaq.qtd_plaquinhas_mensais = mensaisAcumulo.length;
+}
+
+// ========== REBUILD ENGINE ==========
+function categoriaTipo(tipo) {
+  const t = (tipo||'').toLowerCase();
+  if (t.includes('externo')) return 'Cortesia Externa';
+  if (t.includes('pgto') || t.includes('pgt') || t.includes('lote') || t.includes('upgrade')) return 'Venda Paga Externa';
+  if (t.includes('2ª cadeira') || t.includes('segunda cadeira')) return '2ª Cadeira';
+  if (t.includes('tribo') || t.includes('convidado')) return 'Cortesia Aluno (Tribo)';
+  return 'Outro';
+}
+
+function tierTipo(tipo) {
+  const t = (tipo||'').toLowerCase();
+  if (t.includes('premium')) return 'Premium';
+  if (t.includes('black')) return 'Black';
+  if (t.includes('silver')) return 'Silver';
+  return 'N/D';
+}
+
+// Helper: get field from object trying multiple key variations
+function getField(obj, ...keys) {
+  for (const k of keys) {
+    if (obj[k] !== undefined && obj[k] !== null && String(obj[k]).trim() !== '') return String(obj[k]).trim();
+  }
+  // Try case-insensitive
+  const objKeys = Object.keys(obj);
+  for (const k of keys) {
+    const found = objKeys.find(ok => ok.toLowerCase().trim() === k.toLowerCase().trim());
+    if (found && obj[found] !== undefined && obj[found] !== null) return String(obj[found]).trim();
+  }
+  return '';
+}
+
+function rebuildSummit() {
+  const alunosByEmail = {};
+  RAW.alunos.forEach(a => {
+    const e = ne(getField(a, 'Email', 'email', 'E-mail'));
+    if (e) alunosByEmail[e] = a;
+  });
+
+  const bcByEmail = {};
+  RAW.bc_summit.forEach(r => {
+    const e = ne(getField(r, 'Email', 'email', 'E-mail'));
+    const pres = getField(r, 'Presença', 'Presenca', 'Presencia');
+    if (e && pres === 'Sim') bcByEmail[e] = r;
+  });
+
+  // Sympla approved
+  const symplaByEmail = {};
+  RAW.sympla_summit.forEach(r => {
+    const status = getField(r, 'Estado de pagamento', 'Status');
+    if (status !== 'Aprovado') return;
+    const e = ne(getField(r, 'Email', 'email', 'E-mail'));
+    if (!e) return;
+    const tipo = getField(r, 'Tipo de ingresso');
+    const nome = (getField(r, 'Nome') + ' ' + getField(r, 'Sobrenome')).trim();
+    const tel = getField(r, 'Telefone com DDD', 'Telefone');
+    if (!symplaByEmail[e]) symplaByEmail[e] = [];
+    symplaByEmail[e].push({ nome, tipo, cat: categoriaTipo(tipo), tier: tierTipo(tipo), tel });
+  });
+
+  const allEmails = new Set([...Object.keys(bcByEmail), ...Object.keys(symplaByEmail)]);
+  const pessoas = [];
+
+  const ORDER = { Premium:3, Black:2, Silver:1, 'N/D':0 };
+
+  allEmails.forEach(e => {
+    const sy = symplaByEmail[e] || [];
+    const bc = bcByEmail[e] || null;
+    const al = alunosByEmail[e] || null;
+
+    const nome = sy.length ? sy[0].nome : (bc ? getField(bc, 'Aluno', 'Nome') : '');
+    const tel = sy.length ? sy[0].tel : (bc ? getField(bc, 'Telefone') : '');
+    const programa = (al ? getField(al, 'Programa') : (bc ? getField(bc, 'Programa') : '')) || '';
+    const estrategista = (al ? getField(al, 'Estrategista') : (bc ? getField(bc, 'Estrategista') : '')) || '';
+
+    let tierMax = 'N/D';
+    sy.forEach(s => { if ((ORDER[s.tier]||0) > (ORDER[tierMax]||0)) tierMax = s.tier; });
+
+    const cats = [...new Set(sy.map(s=>s.cat))].join(', ');
+    const isAtivo = !!bc;
+    const todasExt = sy.length > 0 && sy.every(s => s.cat==='Venda Paga Externa' || s.cat==='Cortesia Externa');
+    const isAluno = !!al;
+    const isExterno = todasExt && !isAluno;
+
+    let segmento = 'Convidado/Outro';
+    if (isAtivo) segmento = 'Aluno';
+    else if (isExterno) segmento = 'Externo';
+
+    let origem = '—';
+    if (bc && sy.length) origem = 'BC + Sympla';
+    else if (bc) origem = 'Só BC';
+    else if (sy.length) origem = 'Só Sympla';
+
+    pessoas.push({
+      email: e, nome, telefone: tel, programa, estrategista,
+      segmento, tierMax, categorias: cats, origem,
+      no_bc: !!bc, no_sympla: sy.length > 0,
+      qtd_sympla: sy.length, is_chronos: programa.toLowerCase().includes('chronos')
+    });
+  });
+
+  STATE.summit = pessoas;
+  saveState();
+  renderAll();
+}
+
+function rebuildMansao() {
+  const bcByEmail = {};
+  RAW.bc_mansao.forEach(r => {
+    const e = ne(getField(r, 'Email', 'email', 'E-mail'));
+    if (e) bcByEmail[e] = r;
+  });
+
+  const symplaByEmail = {};
+  RAW.sympla_mansao.forEach(r => {
+    const status = getField(r, 'Estado de pagamento', 'Status');
+    if (status !== 'Aprovado') return;
+    const e = ne(getField(r, 'Email', 'email', 'E-mail'));
+    if (!e) return;
+    const nome = (getField(r, 'Nome') + ' ' + getField(r, 'Sobrenome')).trim();
+    const tipo = getField(r, 'Tipo de ingresso');
+    const tel = getField(r, 'Telefone com DDD', 'Telefone');
+    if (!symplaByEmail[e]) symplaByEmail[e] = [];
+    symplaByEmail[e].push({ nome, tipo, tel });
+  });
+
+  const allEmails = new Set([...Object.keys(bcByEmail), ...Object.keys(symplaByEmail)]);
+  const pessoas = [];
+
+  allEmails.forEach(e => {
+    const sy = symplaByEmail[e] || [];
+    const bc = bcByEmail[e] || null;
+    const nome = bc ? getField(bc, 'Aluno', 'Nome') : (sy.length ? sy[0].nome : '');
+    const tel = bc ? getField(bc, 'Telefone') : (sy.length ? sy[0].tel : '');
+    const programa = bc ? getField(bc, 'Programa') : '';
+    const conv = bc ? (getField(bc, 'Convidados') || '0') : '0';
+    const presSummit = bc ? getField(bc, 'Presença Summit', 'Presença') : '';
+
+    // Find in summit data for segmento
+    const summitP = STATE.summit.find(p => p.email === e);
+    const segmento = summitP ? summitP.segmento : (bc ? 'Aluno' : 'Não localizado');
+    const tier = summitP ? summitP.tierMax : 'N/D';
+
+    let origem = '—';
+    if (bc && sy.length) origem = 'BC + Sympla';
+    else if (bc) origem = 'Só BC';
+    else if (sy.length) origem = 'Só Sympla';
+
+    pessoas.push({
+      email: e, nome, telefone: tel, programa, segmento, tier,
+      presenca_summit: presSummit, convidados: conv, origem,
+      no_bc: !!bc, no_sympla: sy.length > 0
+    });
+  });
+
+  STATE.mansao = pessoas;
+  saveState();
+  renderAll();
+}
+
+// ========== RENDER ==========
+function renderAll() {
+  renderDashboard();
+  renderSummitTable();
+  renderMansaoTable();
+  renderPlaquinhas();
+}
+
+function renderDashboard() {
+  const s = STATE.summit;
+  const m = STATE.mansao;
+  const total = s.length;
+  const alunos = s.filter(p=>p.segmento==='Aluno').length;
+  const externos = s.filter(p=>p.segmento==='Externo').length;
+  const convidados = total - alunos - externos;
+  const mansaoTotal = m.length;
+
+  const premium = s.filter(p=>p.tierMax==='Premium').length;
+  const black = s.filter(p=>p.tierMax==='Black').length;
+  const silver = s.filter(p=>p.tierMax==='Silver').length;
+  const nd = s.filter(p=>p.tierMax==='N/D').length;
+
+  const soBc = s.filter(p=>p.no_bc && !p.no_sympla).length;
+  const soSympla = s.filter(p=>p.no_sympla && !p.no_bc).length;
+  const ambos = s.filter(p=>p.no_bc && p.no_sympla).length;
+
+  const chronos = s.filter(p=>p.is_chronos).length;
+  const mansaoPremiumChronos = s.filter(p => p.tierMax === 'Premium' || p.is_chronos).length;
+  const premiumEChronos = s.filter(p => p.tierMax === 'Premium' && p.is_chronos).length;
+  const soPremium = premium - premiumEChronos;
+  const soChronos = chronos - premiumEChronos;
+  const mansaoBcSemSympla = m.filter(p=>p.no_bc && !p.no_sympla).length;
+
+  // Plaquinhas stats
+  const plaqComExtrato = Object.values(STATE.plaquinhas).filter(p=>p.extratos?.length > 0).length;
+
+  let dashPlaqTotal = 0;
+  let dashPlaqMensal = 0;
+  Object.values(STATE.plaquinhas).forEach(p => {
+    if (p.plaq_total && p.plaq_total !== '—') dashPlaqTotal++;
+    if (p.plaq_mensais) dashPlaqMensal += p.plaq_mensais.length;
+  });
+  const dashPlaqUnidades = dashPlaqTotal + dashPlaqMensal;
+
+  // Programs
+  const progCount = {};
+  s.forEach(p => { const pr = p.programa || '(sem)'; progCount[pr] = (progCount[pr]||0)+1; });
+
+  const pct = (n) => total ? (n/total*100).toFixed(1) : 0;
+
+  document.getElementById('panel-dashboard').innerHTML = `
+    <div class="dash-grid">
+      <div class="dash-card purple">
+        <div class="number">${total}</div>
+        <div class="label">Confirmados Summit</div>
+        <div class="sub">Pessoas únicas (BC ∪ Sympla)</div>
+      </div>
+      <div class="dash-card green">
+        <div class="number">${alunos}</div>
+        <div class="label">Alunos</div>
+        <div class="sub">${pct(alunos)}% do total</div>
+      </div>
+      <div class="dash-card yellow">
+        <div class="number">${externos}</div>
+        <div class="label">Externos</div>
+        <div class="sub">${pct(externos)}% do total</div>
+      </div>
+      <div class="dash-card red">
+        <div class="number">${convidados}</div>
+        <div class="label">Convidados / Outros</div>
+        <div class="sub">${pct(convidados)}% do total</div>
+      </div>
+    </div>
+
+    <div class="dash-grid">
+      <div class="dash-card purple">
+        <div class="number">${mansaoTotal}</div>
+        <div class="label">Confirmados Mansão</div>
+        <div class="sub">${mansaoBcSemSympla} no BC sem Sympla</div>
+      </div>
+      <div class="dash-card" style="border-top:3px solid #f59e0b">
+        <div class="number" style="color:#f59e0b">${mansaoPremiumChronos}</div>
+        <div class="label">Mansão: Premium + Chronos</div>
+        <div class="sub">${soPremium} só Premium · ${soChronos} só Chronos · ${premiumEChronos} ambos</div>
+      </div>
+      <div class="dash-card yellow">
+        <div class="number">${soBc}</div>
+        <div class="label">Só no BC</div>
+        <div class="sub">Sem ingresso Sympla</div>
+      </div>
+      <div class="dash-card red">
+        <div class="number">${plaqComExtrato}</div>
+        <div class="label">Extratos Anexados</div>
+        <div class="sub">${dashPlaqUnidades} plaquinhas (${dashPlaqTotal} total + ${dashPlaqMensal} mensal)</div>
+      </div>
+    </div>
+
+    <div class="dash-row2">
+      <div class="dash-section">
+        <h3>Distribuição por Tier</h3>
+        <div class="dash-bar">
+          <div style="width:${pct(premium)}%;background:var(--purple)">${premium}</div>
+          <div style="width:${pct(black)}%;background:#475569">${black}</div>
+          <div style="width:${pct(silver)}%;background:#78716c">${silver}</div>
+          ${nd ? `<div style="width:${pct(nd)}%;background:#1e293b;color:var(--text3)">${nd}</div>` : ''}
+        </div>
+        <div class="dash-legend">
+          <span style="--c:var(--purple)">◼ Premium ${premium}</span>
+          <span style="--c:#475569">◼ Black ${black}</span>
+          <span style="--c:#78716c">◼ Silver ${silver}</span>
+          ${nd ? `<span style="--c:#1e293b">◼ N/D ${nd}</span>` : ''}
+        </div>
+      </div>
+      <div class="dash-section">
+        <h3>Distribuição por Programa</h3>
+        ${Object.entries(progCount).sort((a,b)=>b[1]-a[1]).map(([p,c]) => `
+          <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(51,65,85,.3)">
+            <span style="font-size:13px">${p}</span>
+            <span style="font-size:13px;color:var(--accent2);font-weight:600">${c}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <div class="dash-row2">
+      <div class="dash-section">
+        <h3>Reconciliação BC × Sympla (Summit)</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;text-align:center">
+          <div><div style="font-size:28px;font-weight:700;color:var(--accent2)">${ambos}</div><div style="font-size:11px;color:var(--text2)">BC + Sympla</div></div>
+          <div><div style="font-size:28px;font-weight:700;color:var(--yellow)">${soBc}</div><div style="font-size:11px;color:var(--text2)">Só BC</div></div>
+          <div><div style="font-size:28px;font-weight:700;color:var(--green)">${soSympla}</div><div style="font-size:11px;color:var(--text2)">Só Sympla</div></div>
+        </div>
+      </div>
+      <div class="dash-section">
+        <h3>Segmentos</h3>
+        <div class="dash-bar">
+          <div style="width:${pct(alunos)}%;background:var(--accent)">${alunos}</div>
+          <div style="width:${pct(externos)}%;background:var(--yellow)">${externos}</div>
+          <div style="width:${pct(convidados)}%;background:var(--green)">${convidados}</div>
+        </div>
+        <div class="dash-legend">
+          <span>◼ Alunos ${alunos}</span>
+          <span>◼ Externos ${externos}</span>
+          <span>◼ Convidados ${convidados}</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ========== SORTABLE TABLE HELPER ==========
+let sortState = {};
+
+function renderSortableTable(containerId, data, columns, tableId, rowClassFn) {
+  const panel = document.getElementById(containerId);
+
+  // Controls
+  const filtersHTML = columns.filter(c=>c.filter).map(c => {
+    const vals = [...new Set(data.map(r=>r[c.key]||''))].sort();
+    return `<select data-filter="${c.key}" onchange="filterTable('${tableId}')">
+      <option value="">Todos: ${c.label}</option>
+      ${vals.map(v=>`<option value="${v}">${v}</option>`).join('')}
+    </select>`;
+  }).join('');
+
+  let html = `
+    <div class="table-controls" id="controls-${tableId}">
+      <input type="text" placeholder="Buscar por nome, email..." oninput="filterTable('${tableId}')" data-search>
+      ${filtersHTML}
+      <span class="count" id="count-${tableId}">${data.length} registros</span>
+    </div>
+    <div class="table-wrap">
+      <table id="table-${tableId}">
+        <thead><tr>
+          ${columns.map(c=>`<th data-col="${c.key}" onclick="sortTable('${tableId}','${c.key}')">${c.label}<span class="sort-arrow">⇅</span></th>`).join('')}
+        </tr></thead>
+        <tbody>
+  `;
+
+  data.forEach((r,i) => {
+    const cls = rowClassFn ? rowClassFn(r) : '';
+    html += `<tr class="${cls}" data-idx="${i}">`;
+    columns.forEach(c => {
+      let val = r[c.key] !== undefined ? r[c.key] : '';
+      if (c.render) val = c.render(val, r);
+      else if (c.badge) val = badgeHTML(val, c.badge);
+      html += `<td>${val}</td>`;
+    });
+    html += '</tr>';
+  });
+
+  html += '</tbody></table></div>';
+  panel.innerHTML = html;
+
+  // Store data ref
+  panel._data = data;
+  panel._columns = columns;
+}
+
+function badgeHTML(val, type) {
+  if (type === 'tier') {
+    const cls = val==='Premium' ? 'badge-premium' : val==='Black' ? 'badge-black' : val==='Silver' ? 'badge-silver' : '';
+    return cls ? `<span class="badge ${cls}">${val}</span>` : val;
+  }
+  if (type === 'yesno') {
+    return val ? `<span class="badge badge-sim">SIM</span>` : `<span class="badge badge-nao">NÃO</span>`;
+  }
+  return val;
+}
+
+function filterTable(tableId) {
+  const container = document.getElementById('controls-' + tableId);
+  const search = (container.querySelector('[data-search]').value || '').toLowerCase();
+  const filters = {};
+  container.querySelectorAll('[data-filter]').forEach(sel => {
+    if (sel.value) filters[sel.dataset.filter] = sel.value;
+  });
+
+  const rows = document.querySelectorAll(`#table-${tableId} tbody tr`);
+  let visible = 0;
+  rows.forEach(tr => {
+    const text = tr.textContent.toLowerCase();
+    let show = !search || text.includes(search);
+    if (show) {
+      for (const [key, val] of Object.entries(filters)) {
+        const cellIdx = [...document.querySelectorAll(`#table-${tableId} th`)].findIndex(th=>th.dataset.col===key);
+        if (cellIdx >= 0) {
+          const cellText = tr.cells[cellIdx]?.textContent?.trim() || '';
+          if (cellText !== val) { show = false; break; }
+        }
+      }
+    }
+    tr.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+  document.getElementById('count-' + tableId).textContent = `${visible} registros`;
+}
+
+function sortTable(tableId, col) {
+  const key = tableId + '_' + col;
+  const dir = sortState[key] === 'asc' ? 'desc' : 'asc';
+  sortState[key] = dir;
+
+  const tbody = document.querySelector(`#table-${tableId} tbody`);
+  const rows = [...tbody.querySelectorAll('tr')];
+  const colIdx = [...document.querySelectorAll(`#table-${tableId} th`)].findIndex(th=>th.dataset.col===col);
+
+  rows.sort((a,b) => {
+    let va = a.cells[colIdx]?.textContent?.trim() || '';
+    let vb = b.cells[colIdx]?.textContent?.trim() || '';
+    const na = parseFloat(va), nb = parseFloat(vb);
+    if (!isNaN(na) && !isNaN(nb)) return dir==='asc' ? na-nb : nb-na;
+    return dir==='asc' ? va.localeCompare(vb,'pt') : vb.localeCompare(va,'pt');
+  });
+
+  rows.forEach(r => tbody.appendChild(r));
+}
+
+// ========== RENDER SUMMIT ==========
+function renderSummitTable() {
+  const cols = [
+    { key:'_idx', label:'#', render:(v,r,i) => '' },
+    { key:'nome', label:'Nome' },
+    { key:'email', label:'E-mail' },
+    { key:'telefone', label:'Telefone' },
+    { key:'segmento', label:'Segmento', filter:true },
+    { key:'programa', label:'Programa', filter:true },
+    { key:'tierMax', label:'Tier', filter:true, badge:'tier' },
+    { key:'categorias', label:'Categorias' },
+    { key:'origem', label:'Origem', filter:true },
+  ];
+
+  const data = STATE.summit.map((r,i) => ({...r, _idx:i+1}));
+  renderSortableTable('panel-summit', data, cols, 'summit', r => {
+    if (r.segmento==='Aluno') return 'row-aluno';
+    if (r.segmento==='Externo') return 'row-externo';
+    return 'row-outro';
+  });
+
+  // Fix index column
+  document.querySelectorAll('#table-summit tbody tr').forEach((tr,i) => {
+    tr.cells[0].textContent = i+1;
+  });
+}
+
+// ========== RENDER MANSÃO ==========
+function renderMansaoTable() {
+  const cols = [
+    { key:'_idx', label:'#', render:()=>'' },
+    { key:'nome', label:'Nome' },
+    { key:'email', label:'E-mail' },
+    { key:'telefone', label:'Telefone' },
+    { key:'segmento', label:'Segmento', filter:true },
+    { key:'programa', label:'Programa', filter:true },
+    { key:'tier', label:'Tier', badge:'tier' },
+    { key:'presenca_summit', label:'Presença Summit' },
+    { key:'convidados', label:'Conv.' },
+    { key:'origem', label:'Origem', filter:true },
+  ];
+
+  const data = STATE.mansao.map((r,i) => ({...r, _idx:i+1}));
+  renderSortableTable('panel-mansao', data, cols, 'mansao', r => {
+    if (r.segmento==='Aluno') return 'row-aluno';
+    if (r.segmento==='Externo') return 'row-externo';
+    return 'row-outro';
+  });
+
+  document.querySelectorAll('#table-mansao tbody tr').forEach((tr,i) => {
+    tr.cells[0].textContent = i+1;
+  });
+}
+
+// ========== RENDER PLAQUINHAS ==========
+function renderPlaquinhas() {
+  const alunos = STATE.summit.filter(p => p.segmento === 'Aluno').sort((a,b) => a.nome.localeCompare(b.nome,'pt'));
+
+  // Stats
+  const comExtrato = alunos.filter(a => STATE.plaquinhas[a.email]?.extratos?.length > 0).length;
+  const semExtrato = alunos.length - comExtrato;
+
+  // Count plaquinhas by tier
+  const totalTierCount = {};
+  const mensalTierCount = {};
+  PLAQ_TOTAL_TIERS.forEach(t => totalTierCount[t.label] = 0);
+  PLAQ_MENSAL_TIERS.forEach(t => mensalTierCount[t.label] = 0);
+
+  let totalPlaquinhasMensaisUnidades = 0;
+
+  alunos.forEach(a => {
+    const p = STATE.plaquinhas[a.email];
+    if (!p || !p.extratos?.length) return;
+    if (p.plaq_total && p.plaq_total !== '—') totalTierCount[p.plaq_total] = (totalTierCount[p.plaq_total]||0) + 1;
+    if (p.plaq_mensais && p.plaq_mensais.length > 0) {
+      p.plaq_mensais.forEach(m => {
+        mensalTierCount[m.tier.label] = (mensalTierCount[m.tier.label]||0) + 1;
+        totalPlaquinhasMensaisUnidades++;
+      });
+    }
+  });
+
+  const totalPlaquinhas = Object.values(totalTierCount).reduce((s,v)=>s+v, 0);
+  const totalMensal = totalPlaquinhasMensaisUnidades;
+  const alunosComMensal = alunos.filter(a => STATE.plaquinhas[a.email]?.plaq_mensais?.length > 0).length;
+
+  const fmtFull = (v) => `R$ ${v.toLocaleString('pt-BR', {minimumFractionDigits:0, maximumFractionDigits:0})}`;
+
+  let html = `
+    <!-- KPI Cards -->
+    <div class="dash-grid" style="margin-bottom:20px">
+      <div class="dash-card purple">
+        <div class="number">${alunos.length}</div>
+        <div class="label">Alunos Confirmados</div>
+      </div>
+      <div class="dash-card green">
+        <div class="number">${comExtrato}</div>
+        <div class="label">Com Extrato Anexado</div>
+        <div class="sub">${alunos.length ? ((comExtrato/alunos.length)*100).toFixed(1) : 0}%</div>
+      </div>
+      <div class="dash-card yellow">
+        <div class="number">${totalPlaquinhas + totalMensal}</div>
+        <div class="label">Total Plaquinhas</div>
+        <div class="sub">${totalPlaquinhas} total + ${totalMensal} mensal</div>
+      </div>
+      <div class="dash-card red">
+        <div class="number">${semExtrato}</div>
+        <div class="label">Sem Extrato</div>
+      </div>
+    </div>
+
+    <!-- Plaquinhas Contagem -->
+    <div class="dash-row2" style="margin-bottom:20px">
+      <div class="dash-section">
+        <h3>🏆 Plaquinhas Faturamento Total (${totalPlaquinhas} alunos)</h3>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px">
+          ${PLAQ_TOTAL_TIERS.map(t => {
+            const c = totalTierCount[t.label] || 0;
+            return `<div style="background:rgba(255,255,255,0.04);border:1px solid ${c>0?'rgba(99,102,241,0.4)':'rgba(255,255,255,0.06)'};border-radius:8px;padding:10px;text-align:center">
+              <div style="font-size:11px;color:var(--text3)">${t.icon} ${t.label}</div>
+              <div style="font-size:22px;font-weight:700;color:${c>0?'var(--accent2)':'var(--text3)'}">${c}</div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+      <div class="dash-section">
+        <h3>💰 Plaquinhas Faturamento Mensal (${totalMensal} plaquinhas · ${alunosComMensal} alunos)</h3>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px">
+          ${PLAQ_MENSAL_TIERS.map(t => {
+            const c = mensalTierCount[t.label] || 0;
+            return `<div style="background:rgba(255,255,255,0.04);border:1px solid ${c>0?'rgba(245,158,11,0.4)':'rgba(255,255,255,0.06)'};border-radius:8px;padding:10px;text-align:center">
+              <div style="font-size:11px;color:var(--text3)">${t.icon} ${t.label}</div>
+              <div style="font-size:22px;font-weight:700;color:${c>0?'var(--yellow)':'var(--text3)'}">${c}</div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="table-controls" id="controls-plaq">
+      <input type="text" placeholder="Buscar aluno..." oninput="filterPlaq()" data-search>
+      <select id="plaq-filter-status" onchange="filterPlaq()">
+        <option value="">Todos</option>
+        <option value="com-extrato">Com extrato</option>
+        <option value="sem-extrato">Sem extrato</option>
+      </select>
+      <select id="plaq-filter-ptotal" onchange="filterPlaq()">
+        <option value="">Plaq. Total: Todos</option>
+        ${PLAQ_TOTAL_TIERS.map(t => `<option value="${t.label}">${t.icon} ${t.label}</option>`).join('')}
+        <option value="—">Sem plaquinha</option>
+      </select>
+      <select id="plaq-filter-pmensal" onchange="filterPlaq()">
+        <option value="">Plaq. Mensal: Todos</option>
+        ${PLAQ_MENSAL_TIERS.map(t => `<option value="${t.label}">${t.icon} ${t.label}</option>`).join('')}
+        <option value="—">Sem plaquinha</option>
+      </select>
+      <span class="count" id="count-plaq">${alunos.length} alunos</span>
+    </div>
+    <div class="table-wrap">
+      <table id="table-plaq">
+        <thead><tr>
+          <th>#</th>
+          <th data-col="nome" onclick="sortTable('plaq','nome')">Nome <span class="sort-arrow">⇅</span></th>
+          <th>E-mail</th>
+          <th>Extratos</th>
+          <th data-col="fat_total" onclick="sortTable('plaq','fat_total')">Fat. Total <span class="sort-arrow">⇅</span></th>
+          <th>Plaq. Total</th>
+          <th data-col="fat_mes" onclick="sortTable('plaq','fat_mes')">Maior Mês <span class="sort-arrow">⇅</span></th>
+          <th>Plaq. Mensal</th>
+          <th>Ação</th>
+        </tr></thead>
+        <tbody>
+  `;
+
+  alunos.forEach((a, i) => {
+    const p = STATE.plaquinhas[a.email] || {};
+    const extratos = p.extratos || [];
+    const hasExtrato = extratos.length > 0;
+
+    // Extratos chips
+    let extratosHtml = '';
+    if (hasExtrato) {
+      extratosHtml = extratos.map(ext =>
+        `<span class="extrato-chip" title="${ext.periodo || ext.filename}">${ext.banco} <span class="remove-btn" onclick="event.stopPropagation();removeExtrato('${a.email}',${ext.id})">×</span></span>`
+      ).join('');
+    } else {
+      extratosHtml = '<span style="color:var(--text3);font-size:11px">Nenhum</span>';
+    }
+
+    const fatTotal = p.fat_total || 0;
+    const fatMes = p.fat_maior_mes || 0;
+    const plaqT = p.plaq_total || '—';
+
+    const ptier = PLAQ_TOTAL_TIERS.find(t => t.label === plaqT);
+    const plaqTHtml = ptier ? `<span class="badge" style="background:rgba(99,102,241,0.15);color:var(--accent2)">${ptier.icon} ${ptier.label}</span>` : '<span style="color:var(--text3)">—</span>';
+
+    const mensais = p.plaq_mensais || [];
+    let plaqMHtml = '<span style="color:var(--text3)">—</span>';
+    let plaqMData = '—';
+    if (mensais.length > 0) {
+      plaqMHtml = mensais.map(m =>
+        `<span class="badge" style="background:rgba(245,158,11,0.15);color:var(--yellow);margin:1px">${m.tier.icon} ${m.tier.label}</span>`
+      ).join(' ');
+      plaqMData = mensais.map(m => m.tier.label).join(',');
+    }
+
+    html += `<tr data-status="${hasExtrato ? 'com-extrato' : 'sem-extrato'}" data-ptotal="${plaqT}" data-pmensal="${plaqMData}">
+      <td>${i+1}</td>
+      <td>${a.nome}</td>
+      <td style="font-size:11px">${a.email}</td>
+      <td>${extratosHtml}</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums">${fatTotal > 0 ? fmtFull(fatTotal) : '—'}</td>
+      <td style="text-align:center">${plaqTHtml}</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums">${fatMes > 0 ? fmtFull(fatMes) : '—'}</td>
+      <td style="text-align:center">${plaqMHtml}</td>
+      <td style="text-align:center"><button onclick="openPDFUploadForAluno('${a.email}')" style="padding:4px 10px;background:var(--accent);color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;white-space:nowrap">📄 Anexar Comprovante</button></td>
+    </tr>`;
+  });
+
+  html += '</tbody></table></div>';
+  document.getElementById('panel-plaquinhas').innerHTML = html;
+}
+
+function filterPlaq() {
+  const container = document.getElementById('controls-plaq');
+  const search = (container.querySelector('[data-search]').value || '').toLowerCase();
+  const statusFilter = document.getElementById('plaq-filter-status').value;
+  const ptotalFilter = document.getElementById('plaq-filter-ptotal').value;
+  const pmensalFilter = document.getElementById('plaq-filter-pmensal').value;
+
+  const rows = document.querySelectorAll('#table-plaq tbody tr');
+  let visible = 0;
+  rows.forEach(tr => {
+    const text = tr.textContent.toLowerCase();
+    let show = !search || text.includes(search);
+    if (show && statusFilter) show = tr.dataset.status === statusFilter;
+
+    if (show && ptotalFilter) show = tr.dataset.ptotal === ptotalFilter;
+    if (show && pmensalFilter) {
+      const pmensal = tr.dataset.pmensal || '';
+      if (pmensalFilter === '—') show = pmensal === '—';
+      else show = pmensal.split(',').includes(pmensalFilter);
+    }
+    tr.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+  document.getElementById('count-plaq').textContent = `${visible} alunos`;
+}
+
+// ========== EXPORT ==========
+function exportData() {
+  const wb = XLSX.utils.book_new();
+
+  if (STATE.summit.length) {
+    const ws1 = XLSX.utils.json_to_sheet(STATE.summit.map((p,i) => ({
+      '#': i+1, Nome: p.nome, Email: p.email, Telefone: p.telefone,
+      Segmento: p.segmento, Programa: p.programa, Tier: p.tierMax,
+      Categorias: p.categorias, Origem: p.origem
+    })));
+    XLSX.utils.book_append_sheet(wb, ws1, 'Summit');
+  }
+
+  if (STATE.mansao.length) {
+    const ws2 = XLSX.utils.json_to_sheet(STATE.mansao.map((p,i) => ({
+      '#': i+1, Nome: p.nome, Email: p.email, Telefone: p.telefone,
+      Segmento: p.segmento, Programa: p.programa, Tier: p.tier,
+      'Presença Summit': p.presenca_summit, Convidados: p.convidados, Origem: p.origem
+    })));
+    XLSX.utils.book_append_sheet(wb, ws2, 'Mansão');
+  }
+
+  // Plaquinhas
+  const plaqData = STATE.summit.filter(p=>p.segmento==='Aluno').map((p,i) => {
+    const plaq = STATE.plaquinhas[p.email] || {};
+    return {
+      '#': i+1, Nome: p.nome, Email: p.email, Programa: p.programa,
+      Tier: p.tierMax,
+      'Extratos': (plaq.extratos || []).length,
+      'Bancos': (plaq.extratos || []).map(e=>e.banco).join(', ') || '—',
+      'Fat. Total': plaq.fat_total || 0,
+      'Plaq. Total': plaq.plaq_total || '—',
+      'Maior Mês': plaq.fat_maior_mes || 0,
+      'Plaq. Mensal': (plaq.plaq_mensal_labels || []).join(' + ') || '—',
+      'Qtd Plaq. Mensais': plaq.qtd_plaquinhas_mensais || 0
+    };
+  });
+  if (plaqData.length) {
+    const ws3 = XLSX.utils.json_to_sheet(plaqData);
+    XLSX.utils.book_append_sheet(wb, ws3, 'Plaquinhas');
+  }
+
+  XLSX.writeFile(wb, 'Summit_NSF_2026_Export.xlsx');
+  toast('Exportado com sucesso!');
+}
+
+// filterPlaq is now standalone — no override needed
+</script>
+</body>
+</html>
