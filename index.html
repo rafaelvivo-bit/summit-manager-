@@ -2365,6 +2365,18 @@ function renderDashboard() {
   const soChronos = chronos - premiumEChronos;
   const mansaoBcSemSympla = m.filter(p=>p.no_bc && !p.no_sympla).length;
 
+  // Breakdown Mansão Premium+Chronos por programa e segmento
+  const mpcPessoas = s.filter(p => p.tierMax === 'Premium' || p.is_chronos);
+  const mpcProg = {};
+  mpcPessoas.forEach(p => {
+    const pr = p.programa || '(sem)';
+    mpcProg[pr] = (mpcProg[pr]||0) + 1;
+  });
+  const mpcExternos = mpcPessoas.filter(p => p.segmento === 'Externo').length;
+  const mpcConvidados = mpcPessoas.filter(p => p.segmento === 'Convidado/Outro').length;
+  const mpcAlunos = mpcPessoas.filter(p => p.segmento === 'Aluno').length;
+  const mpcProgSorted = Object.entries(mpcProg).sort((a,b)=>b[1]-a[1]);
+
   // Plaquinhas stats
   const plaqComExtrato = Object.values(STATE.plaquinhas).filter(p=>p.extratos?.length > 0).length;
 
@@ -2423,6 +2435,10 @@ function renderDashboard() {
         <div class="number" style="color:#f59e0b">${mansaoPremiumChronos}</div>
         <div class="label">Mansão: Premium + Chronos</div>
         <div class="sub">${soPremium} só Premium · ${soChronos} só Chronos · ${premiumEChronos} ambos</div>
+        <div class="sub" style="margin-top:6px;font-size:11px;line-height:1.6;opacity:.85">
+          ${mpcProgSorted.map(([p,c]) => `${p}: ${c}`).join(' · ')}<br>
+          ${mpcAlunos} Alunos · ${mpcExternos} Externos · ${mpcConvidados} Convidados
+        </div>
       </div>
       <div class="dash-card yellow" style="cursor:pointer" onclick="goToTabFiltered('summit','summit','origem','Só BC')">
         <div class="number">${soBc}</div>
