@@ -483,13 +483,18 @@ if (sessionStorage.getItem('summit_auth')) {
 }
 
 // ========== TABS ==========
+function goToTab(tabName) {
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+  const tab = document.querySelector(`.tab[data-tab="${tabName}"]`);
+  if (tab) tab.classList.add('active');
+  const panel = document.getElementById('panel-'+tabName);
+  if (panel) panel.classList.add('active');
+  window.scrollTo(0, 0);
+}
+
 document.querySelectorAll('.tab').forEach(t => {
-  t.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
-    document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
-    t.classList.add('active');
-    document.getElementById('panel-'+t.dataset.tab).classList.add('active');
-  });
+  t.addEventListener('click', () => goToTab(t.dataset.tab));
 });
 
 // ========== TOAST ==========
@@ -2359,22 +2364,22 @@ function renderDashboard() {
 
   document.getElementById('panel-dashboard').innerHTML = `
     <div class="dash-grid">
-      <div class="dash-card purple">
+      <div class="dash-card purple" style="cursor:pointer" onclick="goToTab('summit')">
         <div class="number">${total}</div>
         <div class="label">Confirmados Summit</div>
         <div class="sub">Pessoas únicas (BC ∪ Sympla)</div>
       </div>
-      <div class="dash-card green">
+      <div class="dash-card green" style="cursor:pointer" onclick="goToTab('summit')">
         <div class="number">${alunos}</div>
         <div class="label">Alunos</div>
         <div class="sub">${pct(alunos)}% do total</div>
       </div>
-      <div class="dash-card yellow">
+      <div class="dash-card yellow" style="cursor:pointer" onclick="goToTab('summit')">
         <div class="number">${externos}</div>
         <div class="label">Externos</div>
         <div class="sub">${pct(externos)}% do total</div>
       </div>
-      <div class="dash-card red">
+      <div class="dash-card red" style="cursor:pointer" onclick="goToTab('summit')">
         <div class="number">${convidados}</div>
         <div class="label">Convidados / Outros</div>
         <div class="sub">${pct(convidados)}% do total</div>
@@ -2382,22 +2387,22 @@ function renderDashboard() {
     </div>
 
     <div class="dash-grid">
-      <div class="dash-card purple">
+      <div class="dash-card purple" style="cursor:pointer" onclick="goToTab('mansao')">
         <div class="number">${mansaoTotal}</div>
         <div class="label">Confirmados Mansão</div>
         <div class="sub">${mansaoBcSemSympla} no BC sem Sympla</div>
       </div>
-      <div class="dash-card" style="border-top:3px solid #f59e0b">
+      <div class="dash-card" style="border-top:3px solid #f59e0b;cursor:pointer" onclick="goToTab('summit')">
         <div class="number" style="color:#f59e0b">${mansaoPremiumChronos}</div>
         <div class="label">Mansão: Premium + Chronos</div>
         <div class="sub">${soPremium} só Premium · ${soChronos} só Chronos · ${premiumEChronos} ambos</div>
       </div>
-      <div class="dash-card yellow">
+      <div class="dash-card yellow" style="cursor:pointer" onclick="goToTab('summit')">
         <div class="number">${soBc}</div>
         <div class="label">Só no BC</div>
         <div class="sub">Sem ingresso Sympla</div>
       </div>
-      <div class="dash-card red">
+      <div class="dash-card red" style="cursor:pointer" onclick="goToTab('plaquinhas')">
         <div class="number">${plaqComExtrato}</div>
         <div class="label">Extratos Anexados</div>
         <div class="sub">${dashPlaqUnidades} plaquinhas (${dashPlaqTotal} total + ${dashPlaqMensal} mensal)</div>
