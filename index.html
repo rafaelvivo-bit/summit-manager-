@@ -2253,8 +2253,10 @@ function rebuildSummit() {
     const isAluno = !!al;
     const isExterno = todasExt && !isAluno;
 
+    const ingressoErrado = (isAluno && todasExt) ? 'Errado' : 'OK';
+
     let segmento = 'Convidado/Outro';
-    if (isAtivo) segmento = 'Aluno';
+    if (isAtivo || isAluno) segmento = 'Aluno';
     else if (isExterno) segmento = 'Externo';
 
     let origem = '—';
@@ -2264,7 +2266,7 @@ function rebuildSummit() {
 
     pessoas.push({
       email: e, nome, telefone: tel, programa, estrategista,
-      segmento, tierMax, categorias: cats, origem,
+      segmento, tierMax, categorias: cats, origem, ingressoErrado,
       no_bc: !!bc, no_sympla: sy.length > 0,
       qtd_sympla: sy.length, is_chronos: programa.toLowerCase().includes('chronos')
     });
@@ -2355,6 +2357,7 @@ function renderDashboard() {
   const soSympla = s.filter(p=>p.no_sympla && !p.no_bc).length;
   const ambos = s.filter(p=>p.no_bc && p.no_sympla).length;
 
+  const ingressoErradoCount = s.filter(p=>p.ingressoErrado==='Errado').length;
   const chronos = s.filter(p=>p.is_chronos).length;
   const mansaoPremiumChronos = s.filter(p => p.tierMax === 'Premium' || p.is_chronos).length;
   const premiumEChronos = s.filter(p => p.tierMax === 'Premium' && p.is_chronos).length;
@@ -2401,6 +2404,13 @@ function renderDashboard() {
         <div class="label">Convidados / Outros</div>
         <div class="sub">${pct(convidados)}% do total</div>
       </div>
+      ${ingressoErradoCount > 0 ? `
+      <div class="dash-card" style="border-top:3px solid #ef4444;cursor:pointer;background:rgba(239,68,68,0.08)" onclick="goToTabFiltered('summit','summit','ingressoErrado','Errado')">
+        <div class="number" style="color:#ef4444">⚠️ ${ingressoErradoCount}</div>
+        <div class="label">Ingresso Errado</div>
+        <div class="sub">Alunos ativos c/ ingresso externo/cortesia — corrigir no Sympla</div>
+      </div>
+      ` : ''}
     </div>
 
     <div class="dash-grid">
@@ -2599,6 +2609,7 @@ function renderSummitTable() {
     { key:'tierMax', label:'Tier', filter:true, badge:'tier' },
     { key:'categorias', label:'Categorias' },
     { key:'origem', label:'Origem', filter:true },
+    { key:'ingressoErrado', label:'Ingresso', filter:true, render:(v) => v === 'Errado' ? '<span style="color:#ef4444;font-weight:600">Errado</span>' : '<span style="color:#22c55e">OK</span>' },
   ];
 
   const data = STATE.summit.map((r,i) => ({...r, _idx:i+1}));
