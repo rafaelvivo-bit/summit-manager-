@@ -493,6 +493,23 @@ function goToTab(tabName) {
   window.scrollTo(0, 0);
 }
 
+function goToTabFiltered(tabName, tableId, filterKey, filterValue) {
+  goToTab(tabName);
+  // Clear all filters first
+  const controls = document.getElementById('controls-' + tableId);
+  if (!controls) return;
+  const searchInput = controls.querySelector('[data-search]');
+  if (searchInput) searchInput.value = '';
+  controls.querySelectorAll('[data-filter]').forEach(sel => {
+    if (sel.dataset.filter === filterKey) {
+      sel.value = filterValue;
+    } else {
+      sel.value = '';
+    }
+  });
+  filterTable(tableId);
+}
+
 document.querySelectorAll('.tab').forEach(t => {
   t.addEventListener('click', () => goToTab(t.dataset.tab));
 });
@@ -2364,22 +2381,22 @@ function renderDashboard() {
 
   document.getElementById('panel-dashboard').innerHTML = `
     <div class="dash-grid">
-      <div class="dash-card purple" style="cursor:pointer" onclick="goToTab('summit')">
+      <div class="dash-card purple" style="cursor:pointer" onclick="goToTabFiltered('summit','summit','segmento','')">
         <div class="number">${total}</div>
         <div class="label">Confirmados Summit</div>
         <div class="sub">Pessoas únicas (BC ∪ Sympla)</div>
       </div>
-      <div class="dash-card green" style="cursor:pointer" onclick="goToTab('summit')">
+      <div class="dash-card green" style="cursor:pointer" onclick="goToTabFiltered('summit','summit','segmento','Aluno')">
         <div class="number">${alunos}</div>
         <div class="label">Alunos</div>
         <div class="sub">${pct(alunos)}% do total</div>
       </div>
-      <div class="dash-card yellow" style="cursor:pointer" onclick="goToTab('summit')">
+      <div class="dash-card yellow" style="cursor:pointer" onclick="goToTabFiltered('summit','summit','segmento','Externo')">
         <div class="number">${externos}</div>
         <div class="label">Externos</div>
         <div class="sub">${pct(externos)}% do total</div>
       </div>
-      <div class="dash-card red" style="cursor:pointer" onclick="goToTab('summit')">
+      <div class="dash-card red" style="cursor:pointer" onclick="goToTabFiltered('summit','summit','segmento','Convidado/Outro')">
         <div class="number">${convidados}</div>
         <div class="label">Convidados / Outros</div>
         <div class="sub">${pct(convidados)}% do total</div>
@@ -2387,17 +2404,17 @@ function renderDashboard() {
     </div>
 
     <div class="dash-grid">
-      <div class="dash-card purple" style="cursor:pointer" onclick="goToTab('mansao')">
+      <div class="dash-card purple" style="cursor:pointer" onclick="goToTabFiltered('mansao','mansao','segmento','')">
         <div class="number">${mansaoTotal}</div>
         <div class="label">Confirmados Mansão</div>
         <div class="sub">${mansaoBcSemSympla} no BC sem Sympla</div>
       </div>
-      <div class="dash-card" style="border-top:3px solid #f59e0b;cursor:pointer" onclick="goToTab('summit')">
+      <div class="dash-card" style="border-top:3px solid #f59e0b;cursor:pointer" onclick="goToTabFiltered('summit','summit','tierMax','Premium')">
         <div class="number" style="color:#f59e0b">${mansaoPremiumChronos}</div>
         <div class="label">Mansão: Premium + Chronos</div>
         <div class="sub">${soPremium} só Premium · ${soChronos} só Chronos · ${premiumEChronos} ambos</div>
       </div>
-      <div class="dash-card yellow" style="cursor:pointer" onclick="goToTab('summit')">
+      <div class="dash-card yellow" style="cursor:pointer" onclick="goToTabFiltered('summit','summit','origem','Só BC')">
         <div class="number">${soBc}</div>
         <div class="label">Só no BC</div>
         <div class="sub">Sem ingresso Sympla</div>
