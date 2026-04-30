@@ -2253,7 +2253,7 @@ function rebuildSummit() {
     const isAluno = !!al;
     const isExterno = todasExt && !isAluno;
 
-    const ingressoErrado = (isAluno && todasExt) ? 'Errado' : 'OK';
+    const ingressoErrado = (isAluno && !isAtivo && sy.length > 0) ? 'Errado' : 'OK';
 
     let segmento = 'Convidado/Outro';
     if (isAtivo || isAluno) segmento = 'Aluno';
