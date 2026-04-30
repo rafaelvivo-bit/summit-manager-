@@ -8,6 +8,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <style>
 :root {
   --bg: #0f172a; --bg2: #1e293b; --bg3: #334155;
@@ -222,6 +224,21 @@ async function sha256(msg) {
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
 }
 
+// ========== FIREBASE ==========
+const firebaseConfig = {
+  apiKey: "AIzaSyC-A-wkGIigLLSJtJJNYpyzMVi1nqcsw0E",
+  authDomain: "summit-nsf-2026.firebaseapp.com",
+  databaseURL: "https://summit-nsf-2026-default-rtdb.firebaseio.com",
+  projectId: "summit-nsf-2026",
+  storageBucket: "summit-nsf-2026.firebasestorage.app",
+  messagingSenderId: "591774273255",
+  appId: "1:591774273255:web:f8c11f2403cf2c5dffdc42"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+let firebaseReady = false;
+let isSyncingFromFirebase = false; // prevent write loops
+
 // ========== STATE ==========
 let STATE = {
   summit: [],    // pessoas summit
@@ -230,7 +247,14 @@ let STATE = {
 };
 
 function saveState() {
-  try { localStorage.setItem('summit_nsf_2026', JSON.stringify(STATE)); } catch(e) { console.warn('Erro ao salvar STATE:', e); }
+  // Local cache
+  try { localStorage.setItem('summit_nsf_2026', JSON.stringify(STATE)); } catch(e) {}
+  // Firebase
+  if (firebaseReady && !isSyncingFromFirebase) {
+    db.ref('state').set(STATE).then(() => {
+      console.log('STATE salvo no Firebase');
+    }).catch(e => console.warn('Erro Firebase STATE:', e));
+  }
 }
 function loadState() {
   try {
@@ -241,20 +265,24 @@ function loadState() {
 }
 
 function saveRaw() {
+  // Local cache
   try {
     localStorage.setItem('summit_nsf_raw', JSON.stringify(RAW));
     console.log('RAW salvo:', Object.entries(RAW).map(([k,v])=>`${k}:${v.length}`).join(', '));
   } catch(e) {
-    console.warn('Erro ao salvar RAW (possível limite de localStorage):', e);
-    // Se exceder limite, tentar salvar sem os dados mais pesados
+    console.warn('Erro ao salvar RAW (localStorage cheio):', e);
     try {
       const lite = {...RAW};
-      // Manter pelo menos BC e Alunos que são menores
       delete lite.sympla_summit;
       delete lite.sympla_mansao;
       localStorage.setItem('summit_nsf_raw', JSON.stringify(lite));
-      toast('⚠ Dados Sympla grandes demais para cache local. Re-importe Sympla após recarregar.');
-    } catch(e2) { console.warn('Erro ao salvar RAW lite:', e2); }
+    } catch(e2) {}
+  }
+  // Firebase
+  if (firebaseReady && !isSyncingFromFirebase) {
+    db.ref('raw').set(RAW).then(() => {
+      console.log('RAW salvo no Firebase');
+    }).catch(e => console.warn('Erro Firebase RAW:', e));
   }
 }
 function loadRaw() {
@@ -267,6 +295,46 @@ function loadRaw() {
     }
   } catch(e) { console.warn('Erro ao carregar RAW:', e); }
   return false;
+}
+
+// Firebase real-time listener — sync data from other users
+function setupFirebaseListeners() {
+  db.ref('raw').on('value', snap => {
+    const data = snap.val();
+    if (!data) return;
+    isSyncingFromFirebase = true;
+    RAW = {
+      bc_summit: data.bc_summit || [],
+      sympla_summit: data.sympla_summit || [],
+      bc_mansao: data.bc_mansao || [],
+      sympla_mansao: data.sympla_mansao || [],
+      alunos: data.alunos || [],
+      comprovantes: data.comprovantes || []
+    };
+    try { localStorage.setItem('summit_nsf_raw', JSON.stringify(RAW)); } catch(e) {}
+    console.log('RAW sincronizado do Firebase');
+    // Rebuild
+    const hasAnySummit = RAW.bc_summit.length > 0 || RAW.sympla_summit.length > 0;
+    const hasAnyMansao = RAW.bc_mansao.length > 0 || RAW.sympla_mansao.length > 0;
+    if (hasAnySummit) rebuildSummit();
+    if (hasAnyMansao) rebuildMansao();
+    isSyncingFromFirebase = false;
+  });
+
+  db.ref('state/plaquinhas').on('value', snap => {
+    const data = snap.val();
+    if (!data) return;
+    isSyncingFromFirebase = true;
+    STATE.plaquinhas = data;
+    try { localStorage.setItem('summit_nsf_2026', JSON.stringify(STATE)); } catch(e) {}
+    recalcAllPlaquinhas();
+    renderAll();
+    console.log('Plaquinhas sincronizadas do Firebase');
+    isSyncingFromFirebase = false;
+  });
+
+  firebaseReady = true;
+  console.log('Firebase listeners ativos');
 }
 
 // ========== LOGIN ==========
@@ -320,29 +388,90 @@ function recalcAllPlaquinhas() {
   saveState();
 }
 
-function initData() {
-  loadState();
-  const hasRaw = loadRaw();
-  if (hasRaw) {
-    // Rebuild from RAW data to ensure STATE is fresh
-    const hasAnySummit = RAW.bc_summit.length > 0 || RAW.sympla_summit.length > 0;
-    const hasAnyMansao = RAW.bc_mansao.length > 0 || RAW.sympla_mansao.length > 0;
-    if (hasAnySummit) rebuildSummit();
-    if (hasAnyMansao) rebuildMansao();
-    // Recalcular plaquinhas a partir de extratos salvos
-    recalcAllPlaquinhas();
-    if (!hasAnySummit && !hasAnyMansao) renderAll();
-    const parts = [];
-    if (RAW.bc_summit.length) parts.push(`BC Summit: ${RAW.bc_summit.length}`);
-    if (RAW.sympla_summit.length) parts.push(`Sympla Summit: ${RAW.sympla_summit.length}`);
-    if (RAW.bc_mansao.length) parts.push(`BC Mansão: ${RAW.bc_mansao.length}`);
-    if (RAW.sympla_mansao.length) parts.push(`Sympla Mansão: ${RAW.sympla_mansao.length}`);
-    if (RAW.alunos.length) parts.push(`Alunos: ${RAW.alunos.length}`);
-    const plaqCount = Object.values(STATE.plaquinhas).filter(p=>p.extratos?.length).length;
-    if (plaqCount) parts.push(`Extratos: ${plaqCount} alunos`);
-    if (parts.length) toast('Dados restaurados: ' + parts.join(' · '));
-  } else {
-    renderAll();
+async function initData() {
+  toast('Conectando ao servidor...');
+
+  // Try Firebase first
+  try {
+    const rawSnap = await db.ref('raw').once('value');
+    const stateSnap = await db.ref('state').once('value');
+    const rawData = rawSnap.val();
+    const stateData = stateSnap.val();
+
+    if (rawData) {
+      RAW = {
+        bc_summit: rawData.bc_summit || [],
+        sympla_summit: rawData.sympla_summit || [],
+        bc_mansao: rawData.bc_mansao || [],
+        sympla_mansao: rawData.sympla_mansao || [],
+        alunos: rawData.alunos || [],
+        comprovantes: rawData.comprovantes || []
+      };
+      try { localStorage.setItem('summit_nsf_raw', JSON.stringify(RAW)); } catch(e) {}
+    }
+    if (stateData) {
+      STATE = stateData;
+      STATE.summit = STATE.summit || [];
+      STATE.mansao = STATE.mansao || [];
+      STATE.plaquinhas = STATE.plaquinhas || {};
+      try { localStorage.setItem('summit_nsf_2026', JSON.stringify(STATE)); } catch(e) {}
+    }
+
+    // Setup real-time sync
+    setupFirebaseListeners();
+
+    if (rawData) {
+      const hasAnySummit = RAW.bc_summit.length > 0 || RAW.sympla_summit.length > 0;
+      const hasAnyMansao = RAW.bc_mansao.length > 0 || RAW.sympla_mansao.length > 0;
+      isSyncingFromFirebase = true;
+      if (hasAnySummit) rebuildSummit();
+      if (hasAnyMansao) rebuildMansao();
+      recalcAllPlaquinhas();
+      isSyncingFromFirebase = false;
+      if (!hasAnySummit && !hasAnyMansao) renderAll();
+      const parts = [];
+      if (RAW.bc_summit.length) parts.push(`BC Summit: ${RAW.bc_summit.length}`);
+      if (RAW.sympla_summit.length) parts.push(`Sympla Summit: ${RAW.sympla_summit.length}`);
+      if (RAW.bc_mansao.length) parts.push(`BC Mansão: ${RAW.bc_mansao.length}`);
+      if (RAW.sympla_mansao.length) parts.push(`Sympla Mansão: ${RAW.sympla_mansao.length}`);
+      if (RAW.alunos.length) parts.push(`Alunos: ${RAW.alunos.length}`);
+      const plaqCount = Object.values(STATE.plaquinhas).filter(p=>p.extratos?.length).length;
+      if (plaqCount) parts.push(`Extratos: ${plaqCount} alunos`);
+      if (parts.length) toast('🔄 Dados sincronizados: ' + parts.join(' · '));
+      else toast('Conectado — nenhum dado no servidor ainda');
+    } else {
+      // No data in Firebase, try localStorage fallback
+      loadState();
+      const hasRaw = loadRaw();
+      setupFirebaseListeners();
+      if (hasRaw) {
+        const hasAnySummit = RAW.bc_summit.length > 0 || RAW.sympla_summit.length > 0;
+        const hasAnyMansao = RAW.bc_mansao.length > 0 || RAW.sympla_mansao.length > 0;
+        if (hasAnySummit) rebuildSummit();
+        if (hasAnyMansao) rebuildMansao();
+        recalcAllPlaquinhas();
+        if (!hasAnySummit && !hasAnyMansao) renderAll();
+        toast('Dados restaurados do cache local');
+      } else {
+        renderAll();
+        toast('Sistema pronto — faça upload dos dados');
+      }
+    }
+  } catch(e) {
+    console.warn('Firebase indisponível, usando localStorage:', e);
+    loadState();
+    const hasRaw = loadRaw();
+    if (hasRaw) {
+      const hasAnySummit = RAW.bc_summit.length > 0 || RAW.sympla_summit.length > 0;
+      const hasAnyMansao = RAW.bc_mansao.length > 0 || RAW.sympla_mansao.length > 0;
+      if (hasAnySummit) rebuildSummit();
+      if (hasAnyMansao) rebuildMansao();
+      recalcAllPlaquinhas();
+      if (!hasAnySummit && !hasAnyMansao) renderAll();
+      toast('⚠ Modo offline — dados do cache local');
+    } else {
+      renderAll();
+    }
   }
 }
 
