@@ -515,11 +515,11 @@ document.querySelectorAll('.tab').forEach(t => {
 });
 
 // ========== TOAST ==========
-function toast(msg) {
+function toast(msg, duration) {
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.style.display = 'block';
-  setTimeout(()=>{ t.style.display='none'; }, 3000);
+  setTimeout(()=>{ t.style.display='none'; }, duration || 3000);
 }
 
 // ========== UPLOAD HANDLERS ==========
@@ -2076,7 +2076,7 @@ function confirmPDFExtrato() {
   const plaq = STATE.plaquinhas[email];
   if (!plaq.extratos) plaq.extratos = [];
 
-  // Check for duplicates against existing extratos
+  // Info: check for duplicates and overlaps (warn via toast, but always save)
   const newKey = Object.entries(meses).map(([m,v]) => `${m}:${v.toFixed(2)}`).sort().join('|');
   const isDuplicate = plaq.extratos.some(ext => {
     if (!ext.meses) return false;
@@ -2085,12 +2085,9 @@ function confirmPDFExtrato() {
   });
 
   if (isDuplicate) {
-    if (!confirm('⚠ Este extrato parece ser DUPLICADO (mesmos meses e valores já salvos).\n\nDeseja salvar mesmo assim?')) {
-      return;
-    }
+    toast('⚠ Atenção: extrato com mesmos valores já existia. Salvo mesmo assim.', 5000);
   }
 
-  // Check for partial overlap (same months with different values)
   const existingMonths = {};
   plaq.extratos.forEach(ext => {
     if (!ext.meses) return;
@@ -2100,14 +2097,7 @@ function confirmPDFExtrato() {
   });
   const overlappingMonths = Object.keys(meses).filter(m => existingMonths[m]);
   if (overlappingMonths.length > 0 && !isDuplicate) {
-    const monthNames = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-    const overlapDesc = overlappingMonths.map(m => {
-      const [y, mm] = m.split('-');
-      return `${monthNames[parseInt(mm)]}/${y} (existente: R$ ${existingMonths[m].toLocaleString('pt-BR',{minimumFractionDigits:2})}, novo: R$ ${meses[m].toLocaleString('pt-BR',{minimumFractionDigits:2})})`;
-    }).join('\n');
-    if (!confirm(`⚠ Meses já existentes serão SOMADOS:\n\n${overlapDesc}\n\nOs valores serão acumulados. Continuar?`)) {
-      return;
-    }
+    toast('⚠ Meses sobrepostos detectados — valores serão acumulados.', 5000);
   }
 
   // Collect warnings about failed/unread files
