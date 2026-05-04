@@ -2082,30 +2082,6 @@ function confirmPDFExtrato() {
   const plaq = STATE.plaquinhas[email];
   if (!plaq.extratos) plaq.extratos = [];
 
-  // Info: check for duplicates and overlaps (warn via toast, but always save)
-  const newKey = Object.entries(meses).map(([m,v]) => `${m}:${v.toFixed(2)}`).sort().join('|');
-  const isDuplicate = plaq.extratos.some(ext => {
-    if (!ext.meses) return false;
-    const extKey = Object.entries(ext.meses).map(([m,v]) => `${m}:${parseFloat(v).toFixed(2)}`).sort().join('|');
-    return extKey === newKey;
-  });
-
-  if (isDuplicate) {
-    toast('⚠ Atenção: extrato com mesmos valores já existia. Salvo mesmo assim.', 5000);
-  }
-
-  const existingMonths = {};
-  plaq.extratos.forEach(ext => {
-    if (!ext.meses) return;
-    for (const [m, v] of Object.entries(ext.meses)) {
-      existingMonths[m] = (existingMonths[m] || 0) + parseFloat(v);
-    }
-  });
-  const overlappingMonths = Object.keys(meses).filter(m => existingMonths[m]);
-  if (overlappingMonths.length > 0 && !isDuplicate) {
-    toast('⚠ Meses sobrepostos detectados — valores serão acumulados.', 5000);
-  }
-
   // Collect warnings about failed/unread files
   const failedWarnings = (result.warnings || []).filter(w => w.includes('não lido'));
 
