@@ -169,7 +169,7 @@ tr.row-outro td { color:#34d399; }
 <!-- APP -->
 <div class="app" id="app">
   <div class="topbar">
-    <h1>Summit <span>NSF 2026</span> <span style="font-size:12px;color:#ff6;font-weight:700">v6-debug</span></h1>
+    <h1>Summit <span>NSF 2026</span> <span style="font-size:12px;color:#ff6;font-weight:700">v7</span></h1>
     <div class="topbar-actions">
       <label title="Upload BC Summit (.csv)">
         📋 BC Summit
@@ -251,16 +251,18 @@ let STATE = {
   plaquinhas: {} // email -> { comprovante: bool, tipo: string }
 };
 
-function saveState() {
-  // Local cache
+function saveState(waitForFirebase = false) {
+  // Local cache (always synchronous — immediate)
   try { localStorage.setItem('summit_nsf_2026', JSON.stringify(STATE)); } catch(e) {}
   // Firebase
   if (firebaseReady && !isSyncingFromFirebase) {
     lastStateSaveTime = Date.now();
-    db.ref('state').set(STATE).then(() => {
+    const p = db.ref('state').set(STATE).then(() => {
       console.log('STATE salvo no Firebase');
     }).catch(e => { console.warn('Erro Firebase STATE:', e); });
+    if (waitForFirebase) return p; // return promise so caller can await
   }
+  return Promise.resolve();
 }
 function loadState() {
   try {
@@ -429,6 +431,27 @@ async function initData() {
       STATE.summit = STATE.summit || [];
       STATE.mansao = STATE.mansao || [];
       STATE.plaquinhas = STATE.plaquinhas || {};
+
+      // Merge: localStorage plaquinhas may be newer than Firebase (async write delay)
+      try {
+        const localStr = localStorage.getItem('summit_nsf_2026');
+        if (localStr) {
+          const localState = JSON.parse(localStr);
+          if (localState.plaquinhas) {
+            for (const [email, localPlaq] of Object.entries(localState.plaquinhas)) {
+              const fbPlaq = STATE.plaquinhas[email];
+              const localExtratos = (localPlaq.extratos || []).length;
+              const fbExtratos = fbPlaq ? (fbPlaq.extratos || []).length : 0;
+              // Keep whichever has more extratos (more data = more recent)
+              if (localExtratos > fbExtratos) {
+                STATE.plaquinhas[email] = localPlaq;
+                console.log(`Plaquinha ${email}: localStorage tem ${localExtratos} extratos vs Firebase ${fbExtratos} — usando local`);
+              }
+            }
+          }
+        }
+      } catch(e) { console.warn('Erro merge localStorage:', e); }
+
       try { localStorage.setItem('summit_nsf_2026', JSON.stringify(STATE)); } catch(e) {}
     }
 
@@ -2060,12 +2083,11 @@ function closePDFModal() {
   currentPDFResult = null;
 }
 
-function confirmPDFExtrato() {
-  alert('DEBUG v6: confirmPDFExtrato chamada! email=' + (currentPDFEmail||'NULL'));
+async function confirmPDFExtrato() {
   try {
     const email = currentPDFEmail;
     const result = currentPDFResult;
-    if (!email || !result) { alert('Erro: email ou resultado ausente'); return; }
+    if (!email || !result) { toast('Erro: email ou resultado ausente'); return; }
 
     // Read edited values from modal
     const inputs = document.querySelectorAll('#pdf-modal .month-input-grid input[data-month]');
@@ -2107,20 +2129,18 @@ function confirmPDFExtrato() {
     });
 
     // Recalc this aluno
-    alert('DEBUG: extratos.push OK, chamando recalc...');
     recalcAlunoPlaquinhas(email);
 
-    // Save
-    alert('DEBUG: recalc OK, chamando saveState...');
-    try { saveState(); } catch(saveErr) { alert('Erro saveState: ' + saveErr.message); }
+    // Save to localStorage (instant) + Firebase (await completion)
+    toast('Salvando...', 2000);
+    await saveState(true); // wait for Firebase write to complete
 
-    alert('DEBUG: saveState OK, fechando modal...');
     closePDFModal();
-    toast(`Extrato salvo para ${plaq.nome || email}`);
+    toast(`✅ Extrato salvo para ${plaq.nome || email}`);
     renderAll();
-    alert('DEBUG: TUDO CONCLUÍDO!');
   } catch(err) {
-    alert('ERRO CAPTURADO: ' + err.message + '\n' + err.stack);
+    console.error('ERRO em confirmPDFExtrato:', err);
+    toast('❌ Erro ao salvar: ' + err.message, 8000);
   }
 }
 
