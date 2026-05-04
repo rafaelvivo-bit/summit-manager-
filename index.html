@@ -2110,13 +2110,17 @@ function confirmPDFExtrato() {
     }
   }
 
+  // Collect warnings about failed/unread files
+  const failedWarnings = (result.warnings || []).filter(w => w.includes('não lido'));
+
   // Add this extrato
   plaq.extratos.push({
     id: Date.now(),
     filename: result.filename,
     banco: result.banco,
     periodo: result.periodo,
-    meses: meses
+    meses: meses,
+    alertas: failedWarnings
   });
 
   // Recalc this aluno
@@ -2784,6 +2788,7 @@ function renderPlaquinhas() {
           <th>Plaq. Total</th>
           <th data-col="fat_mes" onclick="sortTable('plaq','fat_mes')">Maior Mês <span class="sort-arrow">⇅</span></th>
           <th>Plaq. Mensal</th>
+          <th>Alertas</th>
           <th>Ação</th>
         </tr></thead>
         <tbody>
@@ -2830,6 +2835,15 @@ function renderPlaquinhas() {
       <td style="text-align:center">${plaqTHtml}</td>
       <td style="text-align:right;font-variant-numeric:tabular-nums">${fatMes > 0 ? fmtFull(fatMes) : '—'}</td>
       <td style="text-align:center">${plaqMHtml}</td>
+      <td style="font-size:10px;max-width:220px">${(() => {
+        const alertas = extratos.flatMap(ext => ext.alertas || []);
+        if (alertas.length === 0) return '<span style="color:var(--text3)">—</span>';
+        const files = alertas.map(a => {
+          const match = a.match(/adicione manualmente: (.+)$/);
+          return match ? match[1] : a;
+        }).join(', ');
+        return `<span style="color:var(--red);font-weight:600" title="${files}">⚠ ${alertas.length} alerta(s)<br><span style="font-weight:400;font-size:9px">${files}</span></span>`;
+      })()}</td>
       <td style="text-align:center"><button onclick="openPDFUploadForAluno('${a.email}')" style="padding:4px 10px;background:var(--accent);color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;white-space:nowrap">📄 Anexar Comprovante</button></td>
     </tr>`;
   });
