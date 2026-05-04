@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Summit NSF 2026 — Gestão de Participantes</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -166,7 +169,7 @@ tr.row-outro td { color:#34d399; }
 <!-- APP -->
 <div class="app" id="app">
   <div class="topbar">
-    <h1>Summit <span>NSF 2026</span> <span style="font-size:10px;color:var(--text3);font-weight:400">v5</span></h1>
+    <h1>Summit <span>NSF 2026</span> <span style="font-size:12px;color:#ff6;font-weight:700">v6-debug</span></h1>
     <div class="topbar-actions">
       <label title="Upload BC Summit (.csv)">
         📋 BC Summit
@@ -2058,10 +2061,11 @@ function closePDFModal() {
 }
 
 function confirmPDFExtrato() {
+  alert('DEBUG v6: confirmPDFExtrato chamada! email=' + (currentPDFEmail||'NULL'));
   try {
     const email = currentPDFEmail;
     const result = currentPDFResult;
-    if (!email || !result) { toast('Erro: email ou resultado ausente'); return; }
+    if (!email || !result) { alert('Erro: email ou resultado ausente'); return; }
 
     // Read edited values from modal
     const inputs = document.querySelectorAll('#pdf-modal .month-input-grid input[data-month]');
@@ -2103,18 +2107,20 @@ function confirmPDFExtrato() {
     });
 
     // Recalc this aluno
+    alert('DEBUG: extratos.push OK, chamando recalc...');
     recalcAlunoPlaquinhas(email);
 
-    // Save — wrapped separately to catch Firebase errors
-    try { saveState(); } catch(saveErr) { console.error('Erro no saveState:', saveErr); }
+    // Save
+    alert('DEBUG: recalc OK, chamando saveState...');
+    try { saveState(); } catch(saveErr) { alert('Erro saveState: ' + saveErr.message); }
 
+    alert('DEBUG: saveState OK, fechando modal...');
     closePDFModal();
     toast(`Extrato salvo para ${plaq.nome || email}`);
     renderAll();
-    console.log('confirmPDFExtrato concluído com sucesso para', email);
+    alert('DEBUG: TUDO CONCLUÍDO!');
   } catch(err) {
-    console.error('ERRO em confirmPDFExtrato:', err);
-    toast('❌ Erro ao salvar: ' + err.message, 8000);
+    alert('ERRO CAPTURADO: ' + err.message + '\n' + err.stack);
   }
 }
 
