@@ -238,8 +238,8 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 let firebaseReady = false;
 let isSyncingFromFirebase = false; // prevent write loops
-let isLocalSave = false; // prevent Firebase echo overwriting local state
-let isLocalRawSave = false;
+let lastStateSaveTime = 0; // timestamp to debounce Firebase listener echoes
+let lastRawSaveTime = 0;
 
 // ========== STATE ==========
 let STATE = {
@@ -253,10 +253,10 @@ function saveState() {
   try { localStorage.setItem('summit_nsf_2026', JSON.stringify(STATE)); } catch(e) {}
   // Firebase
   if (firebaseReady && !isSyncingFromFirebase) {
-    isLocalSave = true; // prevent listener echo from overwriting local state
+    lastStateSaveTime = Date.now();
     db.ref('state').set(STATE).then(() => {
       console.log('STATE salvo no Firebase');
-    }).catch(e => { isLocalSave = false; console.warn('Erro Firebase STATE:', e); });
+    }).catch(e => { console.warn('Erro Firebase STATE:', e); });
   }
 }
 function loadState() {
@@ -283,10 +283,10 @@ function saveRaw() {
   }
   // Firebase
   if (firebaseReady && !isSyncingFromFirebase) {
-    isLocalRawSave = true;
+    lastRawSaveTime = Date.now();
     db.ref('raw').set(RAW).then(() => {
       console.log('RAW salvo no Firebase');
-    }).catch(e => { isLocalRawSave = false; console.warn('Erro Firebase RAW:', e); });
+    }).catch(e => { console.warn('Erro Firebase RAW:', e); });
   }
 }
 function loadRaw() {
@@ -306,7 +306,7 @@ function setupFirebaseListeners() {
   db.ref('raw').on('value', snap => {
     const data = snap.val();
     if (!data) return;
-    if (isLocalRawSave) { isLocalRawSave = false; return; } // skip echo from own save
+    if (Date.now() - lastRawSaveTime < 5000) return; // skip echo from own save (5s debounce)
     isSyncingFromFirebase = true;
     RAW = {
       bc_summit: data.bc_summit || [],
@@ -329,7 +329,7 @@ function setupFirebaseListeners() {
   db.ref('state/plaquinhas').on('value', snap => {
     const data = snap.val();
     if (!data) return;
-    if (isLocalSave) { isLocalSave = false; return; } // skip echo from own save
+    if (Date.now() - lastStateSaveTime < 5000) return; // skip echo from own save (5s debounce)
     isSyncingFromFirebase = true;
     STATE.plaquinhas = data;
     try { localStorage.setItem('summit_nsf_2026', JSON.stringify(STATE)); } catch(e) {}
