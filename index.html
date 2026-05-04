@@ -169,7 +169,7 @@ tr.row-outro td { color:#34d399; }
 <!-- APP -->
 <div class="app" id="app">
   <div class="topbar">
-    <h1>Summit <span>NSF 2026</span> <span style="font-size:12px;color:#ff6;font-weight:700">v7</span></h1>
+    <h1>Summit <span>NSF 2026</span> <span style="font-size:12px;color:#ff6;font-weight:700">v8</span></h1>
     <div class="topbar-actions">
       <label title="Upload BC Summit (.csv)">
         📋 BC Summit
@@ -251,16 +251,41 @@ let STATE = {
   plaquinhas: {} // email -> { comprovante: bool, tipo: string }
 };
 
+// Firebase key sanitization: dots/special chars are illegal in Firebase keys
+function fbEncode(key) { return key.replace(/\./g, '%2E').replace(/#/g, '%23').replace(/\$/g, '%24').replace(/\[/g, '%5B').replace(/\]/g, '%5D').replace(/\//g, '%2F'); }
+function fbDecode(key) { return key.replace(/%2E/g, '.').replace(/%23/g, '#').replace(/%24/g, '$').replace(/%5B/g, '[').replace(/%5D/g, ']').replace(/%2F/g, '/'); }
+
+function firebaseSafeState() {
+  // Clone STATE but encode plaquinhas keys for Firebase compatibility
+  const safe = JSON.parse(JSON.stringify(STATE));
+  const encodedPlaq = {};
+  for (const [email, data] of Object.entries(safe.plaquinhas || {})) {
+    encodedPlaq[fbEncode(email)] = data;
+  }
+  safe.plaquinhas = encodedPlaq;
+  return safe;
+}
+
+function decodeFirebasePlaquinhas(plaqObj) {
+  // Decode Firebase keys back to real email addresses
+  const decoded = {};
+  for (const [key, data] of Object.entries(plaqObj || {})) {
+    decoded[fbDecode(key)] = data;
+  }
+  return decoded;
+}
+
 function saveState(waitForFirebase = false) {
-  // Local cache (always synchronous — immediate)
+  // Local cache (always synchronous — immediate, uses real email keys)
   try { localStorage.setItem('summit_nsf_2026', JSON.stringify(STATE)); } catch(e) {}
-  // Firebase
+  // Firebase (encode keys)
   if (firebaseReady && !isSyncingFromFirebase) {
     lastStateSaveTime = Date.now();
-    const p = db.ref('state').set(STATE).then(() => {
+    const safeState = firebaseSafeState();
+    const p = db.ref('state').set(safeState).then(() => {
       console.log('STATE salvo no Firebase');
     }).catch(e => { console.warn('Erro Firebase STATE:', e); });
-    if (waitForFirebase) return p; // return promise so caller can await
+    if (waitForFirebase) return p;
   }
   return Promise.resolve();
 }
@@ -339,7 +364,7 @@ function setupFirebaseListeners() {
       // Only load from Firebase if local state is empty (first load)
       const localHasData = Object.keys(STATE.plaquinhas || {}).length > 0;
       if (!localHasData) {
-        STATE.plaquinhas = data.plaquinhas;
+        STATE.plaquinhas = decodeFirebasePlaquinhas(data.plaquinhas);
         try { localStorage.setItem('summit_nsf_2026', JSON.stringify(STATE)); } catch(e) {}
         recalcAllPlaquinhas();
         renderAll();
@@ -430,7 +455,8 @@ async function initData() {
       STATE = stateData;
       STATE.summit = STATE.summit || [];
       STATE.mansao = STATE.mansao || [];
-      STATE.plaquinhas = STATE.plaquinhas || {};
+      // Decode Firebase keys (email%2Ecom → email.com)
+      STATE.plaquinhas = decodeFirebasePlaquinhas(STATE.plaquinhas || {});
 
       // Merge: localStorage plaquinhas may be newer than Firebase (async write delay)
       try {
