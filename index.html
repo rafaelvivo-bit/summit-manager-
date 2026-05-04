@@ -166,7 +166,7 @@ tr.row-outro td { color:#34d399; }
 <!-- APP -->
 <div class="app" id="app">
   <div class="topbar">
-    <h1>Summit <span>NSF 2026</span></h1>
+    <h1>Summit <span>NSF 2026</span> <span style="font-size:10px;color:var(--text3);font-weight:400">v5</span></h1>
     <div class="topbar-actions">
       <label title="Upload BC Summit (.csv)">
         📋 BC Summit
@@ -301,12 +301,13 @@ function loadRaw() {
   return false;
 }
 
-// Firebase real-time listener — sync data from other users
+// Firebase sync — RAW uses real-time listener; STATE loads once (no listener to avoid overwrites)
 function setupFirebaseListeners() {
+  // RAW: real-time sync (safe — only uploads trigger writes, no race condition)
   db.ref('raw').on('value', snap => {
     const data = snap.val();
     if (!data) return;
-    if (Date.now() - lastRawSaveTime < 5000) return; // skip echo from own save (5s debounce)
+    if (Date.now() - lastRawSaveTime < 5000) return;
     isSyncingFromFirebase = true;
     RAW = {
       bc_summit: data.bc_summit || [],
@@ -318,7 +319,6 @@ function setupFirebaseListeners() {
     };
     try { localStorage.setItem('summit_nsf_raw', JSON.stringify(RAW)); } catch(e) {}
     console.log('RAW sincronizado do Firebase');
-    // Rebuild
     const hasAnySummit = RAW.bc_summit.length > 0 || RAW.sympla_summit.length > 0;
     const hasAnyMansao = RAW.bc_mansao.length > 0 || RAW.sympla_mansao.length > 0;
     if (hasAnySummit) rebuildSummit();
@@ -326,17 +326,23 @@ function setupFirebaseListeners() {
     isSyncingFromFirebase = false;
   });
 
-  db.ref('state/plaquinhas').on('value', snap => {
+  // STATE/plaquinhas: load ONCE from Firebase (no real-time listener)
+  // This prevents the listener from overwriting local saves with stale data
+  db.ref('state').once('value', snap => {
     const data = snap.val();
-    if (!data) return;
-    if (Date.now() - lastStateSaveTime < 5000) return; // skip echo from own save (5s debounce)
-    isSyncingFromFirebase = true;
-    STATE.plaquinhas = data;
-    try { localStorage.setItem('summit_nsf_2026', JSON.stringify(STATE)); } catch(e) {}
-    recalcAllPlaquinhas();
-    renderAll();
-    console.log('Plaquinhas sincronizadas do Firebase');
-    isSyncingFromFirebase = false;
+    if (data && data.plaquinhas) {
+      // Only load from Firebase if local state is empty (first load)
+      const localHasData = Object.keys(STATE.plaquinhas || {}).length > 0;
+      if (!localHasData) {
+        STATE.plaquinhas = data.plaquinhas;
+        try { localStorage.setItem('summit_nsf_2026', JSON.stringify(STATE)); } catch(e) {}
+        recalcAllPlaquinhas();
+        renderAll();
+        console.log('Plaquinhas carregadas do Firebase (carga inicial)');
+      } else {
+        console.log('Plaquinhas locais já existem, mantendo estado local');
+      }
+    }
   });
 
   firebaseReady = true;
@@ -2052,55 +2058,64 @@ function closePDFModal() {
 }
 
 function confirmPDFExtrato() {
-  const email = currentPDFEmail;
-  const result = currentPDFResult;
-  if (!email || !result) return;
+  try {
+    const email = currentPDFEmail;
+    const result = currentPDFResult;
+    if (!email || !result) { toast('Erro: email ou resultado ausente'); return; }
 
-  // Read edited values from modal
-  const inputs = document.querySelectorAll('#pdf-modal .month-input-grid input[data-month]');
-  const meses = {};
-  inputs.forEach(inp => {
-    const month = inp.dataset.month || inp.closest('.month-input-item')?.querySelector('[data-month-key]')?.value;
-    if (!month) return;
-    const val = parseFloat(inp.value) || 0;
-    if (val > 0) meses[month] = val;
-  });
+    // Read edited values from modal
+    const inputs = document.querySelectorAll('#pdf-modal .month-input-grid input[data-month]');
+    const meses = {};
+    inputs.forEach(inp => {
+      const month = inp.dataset.month || inp.closest('.month-input-item')?.querySelector('[data-month-key]')?.value;
+      if (!month) return;
+      const val = parseFloat(inp.value) || 0;
+      if (val > 0) meses[month] = val;
+    });
 
-  if (Object.keys(meses).length === 0) {
-    toast('Nenhum mês com valor > 0');
-    return;
+    if (Object.keys(meses).length === 0) {
+      toast('Nenhum mês com valor > 0');
+      return;
+    }
+
+    // Initialize plaquinha entry if needed
+    if (!STATE.plaquinhas[email]) {
+      const aluno = STATE.summit.find(p => p.email === email);
+      STATE.plaquinhas[email] = {
+        nome: aluno ? aluno.nome : '',
+        extratos: []
+      };
+    }
+    const plaq = STATE.plaquinhas[email];
+    if (!plaq.extratos) plaq.extratos = [];
+
+    // Collect warnings about failed/unread files
+    const failedWarnings = (result.warnings || []).filter(w => w.includes('não lido'));
+
+    // Add this extrato
+    plaq.extratos.push({
+      id: Date.now(),
+      filename: result.filename,
+      banco: result.banco,
+      periodo: result.periodo,
+      meses: meses,
+      alertas: failedWarnings
+    });
+
+    // Recalc this aluno
+    recalcAlunoPlaquinhas(email);
+
+    // Save — wrapped separately to catch Firebase errors
+    try { saveState(); } catch(saveErr) { console.error('Erro no saveState:', saveErr); }
+
+    closePDFModal();
+    toast(`Extrato salvo para ${plaq.nome || email}`);
+    renderAll();
+    console.log('confirmPDFExtrato concluído com sucesso para', email);
+  } catch(err) {
+    console.error('ERRO em confirmPDFExtrato:', err);
+    toast('❌ Erro ao salvar: ' + err.message, 8000);
   }
-
-  // Initialize plaquinha entry if needed
-  if (!STATE.plaquinhas[email]) {
-    const aluno = STATE.summit.find(p => p.email === email);
-    STATE.plaquinhas[email] = {
-      nome: aluno ? aluno.nome : '',
-      extratos: []
-    };
-  }
-  const plaq = STATE.plaquinhas[email];
-  if (!plaq.extratos) plaq.extratos = [];
-
-  // Collect warnings about failed/unread files
-  const failedWarnings = (result.warnings || []).filter(w => w.includes('não lido'));
-
-  // Add this extrato
-  plaq.extratos.push({
-    id: Date.now(),
-    filename: result.filename,
-    banco: result.banco,
-    periodo: result.periodo,
-    meses: meses,
-    alertas: failedWarnings
-  });
-
-  // Recalc this aluno
-  recalcAlunoPlaquinhas(email);
-  saveState();
-  closePDFModal();
-  toast(`Extrato salvo para ${plaq.nome || email}`);
-  renderAll();
 }
 
 function removeExtrato(email, extratoId) {
