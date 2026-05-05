@@ -169,7 +169,7 @@ tr.row-outro td { color:#34d399; }
 <!-- APP -->
 <div class="app" id="app">
   <div class="topbar">
-    <h1>Summit <span>NSF 2026</span> <span style="font-size:12px;color:#ff6;font-weight:700">v9</span></h1>
+    <h1>Summit <span>NSF 2026</span> <span style="font-size:12px;color:#ff6;font-weight:700">v10</span></h1>
     <div class="topbar-actions">
       <label title="Upload BC Summit (.csv)">
         📋 BC Summit
@@ -2272,6 +2272,14 @@ function rebuildSummit() {
     symplaByEmail[e].push({ nome, tipo, cat: categoriaTipo(tipo), tier: tierTipo(tipo), tel });
   });
 
+  // Build mansão lookup (BC Mansão confirmed)
+  const mansaoEmails = new Set();
+  RAW.bc_mansao.forEach(r => {
+    const e = ne(getField(r, 'Email', 'email', 'E-mail'));
+    const pres = getField(r, 'Presença', 'Presenca', 'Mansão');
+    if (e && pres === 'Sim') mansaoEmails.add(e);
+  });
+
   const allEmails = new Set([...Object.keys(bcByEmail), ...Object.keys(symplaByEmail)]);
   const pessoas = [];
 
@@ -2307,11 +2315,14 @@ function rebuildSummit() {
     else if (bc) origem = 'Só BC';
     else if (sy.length) origem = 'Só Sympla';
 
+    const has_mansao = mansaoEmails.has(e);
+
     pessoas.push({
       email: e, nome, telefone: tel, programa, estrategista,
       segmento, tierMax, categorias: cats, origem, ingressoErrado,
       no_bc: !!bc, no_sympla: sy.length > 0,
-      qtd_sympla: sy.length, is_chronos: programa.toLowerCase().includes('chronos')
+      qtd_sympla: sy.length, is_chronos: programa.toLowerCase().includes('chronos'),
+      has_mansao
     });
   });
 
@@ -2402,14 +2413,16 @@ function renderDashboard() {
 
   const ingressoErradoCount = s.filter(p=>p.ingressoErrado==='Errado').length;
   const chronos = s.filter(p=>p.is_chronos).length;
-  const mansaoPremiumChronos = s.filter(p => p.tierMax === 'Premium' || p.is_chronos).length;
+  // Mansão access: Premium OR Chronos OR (Silver/Black com bônus mansão)
+  const silverBlackMansao = s.filter(p => (p.tierMax === 'Silver' || p.tierMax === 'Black') && p.has_mansao && !p.is_chronos).length;
+  const mansaoPremiumChronos = s.filter(p => p.tierMax === 'Premium' || p.is_chronos || ((p.tierMax === 'Silver' || p.tierMax === 'Black') && p.has_mansao)).length;
   const premiumEChronos = s.filter(p => p.tierMax === 'Premium' && p.is_chronos).length;
   const soPremium = premium - premiumEChronos;
   const soChronos = chronos - premiumEChronos;
   const mansaoBcSemSympla = m.filter(p=>p.no_bc && !p.no_sympla).length;
 
-  // Breakdown Mansão Premium+Chronos por programa e segmento
-  const mpcPessoas = s.filter(p => p.tierMax === 'Premium' || p.is_chronos);
+  // Breakdown Mansão: Premium + Chronos + Silver/Black c/ bônus
+  const mpcPessoas = s.filter(p => p.tierMax === 'Premium' || p.is_chronos || ((p.tierMax === 'Silver' || p.tierMax === 'Black') && p.has_mansao));
   const mpcProg = {};
   mpcPessoas.forEach(p => {
     const pr = p.programa || '(sem)';
@@ -2476,8 +2489,8 @@ function renderDashboard() {
       </div>
       <div class="dash-card" style="border-top:3px solid #f59e0b;cursor:pointer" onclick="goToTabFiltered('summit','summit','tierMax','Premium')">
         <div class="number" style="color:#f59e0b">${mansaoPremiumChronos}</div>
-        <div class="label">Mansão: Premium + Chronos</div>
-        <div class="sub">${soPremium} só Premium · ${soChronos} só Chronos · ${premiumEChronos} ambos</div>
+        <div class="label">MANSÃO: PREMIUM + CHRONOS</div>
+        <div class="sub">${soPremium} só Premium · ${soChronos} só Chronos · ${premiumEChronos} ambos${silverBlackMansao > 0 ? ` · ${silverBlackMansao} Silver/Black c/ bônus` : ''}</div>
         <div class="sub" style="margin-top:6px;font-size:11px;line-height:1.6;opacity:.85">
           ${mpcProgSorted.map(([p,c]) => `${p}: ${c}`).join(' · ')}<br>
           ${mpcAlunos} Alunos · ${mpcExternos} Externos · ${mpcConvidados} Convidados
