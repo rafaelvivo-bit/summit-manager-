@@ -169,7 +169,7 @@ tr.row-outro td { color:#34d399; }
 <!-- APP -->
 <div class="app" id="app">
   <div class="topbar">
-    <h1>Summit <span>NSF 2026</span> <span style="font-size:12px;color:#ff6;font-weight:700">v10</span></h1>
+    <h1>Summit <span>NSF 2026</span> <span style="font-size:12px;color:#ff6;font-weight:700">v11</span></h1>
     <div class="topbar-actions">
       <label title="Upload BC Summit (.csv)">
         📋 BC Summit
@@ -2272,13 +2272,21 @@ function rebuildSummit() {
     symplaByEmail[e].push({ nome, tipo, cat: categoriaTipo(tipo), tier: tierTipo(tipo), tel });
   });
 
-  // Build mansão lookup (BC Mansão confirmed)
+  // Build mansão lookup from two sources
   const mansaoEmails = new Set();
+  // Source 1: BC Mansão CSV — column "Mansão" = "Sim"
   RAW.bc_mansao.forEach(r => {
     const e = ne(getField(r, 'Email', 'email', 'E-mail'));
-    const pres = getField(r, 'Presença', 'Presenca', 'Mansão');
-    if (e && pres === 'Sim') mansaoEmails.add(e);
+    const mansao = getField(r, 'Mansão');
+    if (e && mansao === 'Sim') mansaoEmails.add(e);
   });
+  // Source 2: BC Summit — column "Mansão" = "Sim"
+  RAW.bc_summit.forEach(r => {
+    const e = ne(getField(r, 'Email', 'email', 'E-mail'));
+    const mansao = getField(r, 'Mansão');
+    if (e && mansao === 'Sim') mansaoEmails.add(e);
+  });
+  console.log('Mansão emails encontrados:', mansaoEmails.size);
 
   const allEmails = new Set([...Object.keys(bcByEmail), ...Object.keys(symplaByEmail)]);
   const pessoas = [];
