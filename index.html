@@ -169,7 +169,7 @@ tr.row-outro td { color:#34d399; }
 <!-- APP -->
 <div class="app" id="app">
   <div class="topbar">
-    <h1>Summit <span>NSF 2026</span> <span style="font-size:12px;color:#ff6;font-weight:700">v11</span></h1>
+    <h1>Summit <span>NSF 2026</span> <span style="font-size:12px;color:#ff6;font-weight:700">v12</span></h1>
     <div class="topbar-actions">
       <label title="Upload BC Summit (.csv)">
         📋 BC Summit
@@ -2796,7 +2796,7 @@ function renderPlaquinhas() {
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px">
           ${PLAQ_TOTAL_TIERS.map(t => {
             const c = totalTierCount[t.label] || 0;
-            return `<div style="background:rgba(255,255,255,0.04);border:1px solid ${c>0?'rgba(99,102,241,0.4)':'rgba(255,255,255,0.06)'};border-radius:8px;padding:10px;text-align:center">
+            return `<div style="background:rgba(255,255,255,0.04);border:1px solid ${c>0?'rgba(99,102,241,0.4)':'rgba(255,255,255,0.06)'};border-radius:8px;padding:10px;text-align:center;${c>0?'cursor:pointer':'opacity:0.5'}" ${c>0?`onclick="showPlaqTierModal('total','${t.label}','${t.icon}')"`:''}>
               <div style="font-size:11px;color:var(--text3)">${t.icon} ${t.label}</div>
               <div style="font-size:22px;font-weight:700;color:${c>0?'var(--accent2)':'var(--text3)'}">${c}</div>
             </div>`;
@@ -2808,7 +2808,7 @@ function renderPlaquinhas() {
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px">
           ${PLAQ_MENSAL_TIERS.map(t => {
             const c = mensalTierCount[t.label] || 0;
-            return `<div style="background:rgba(255,255,255,0.04);border:1px solid ${c>0?'rgba(245,158,11,0.4)':'rgba(255,255,255,0.06)'};border-radius:8px;padding:10px;text-align:center">
+            return `<div style="background:rgba(255,255,255,0.04);border:1px solid ${c>0?'rgba(245,158,11,0.4)':'rgba(255,255,255,0.06)'};border-radius:8px;padding:10px;text-align:center;${c>0?'cursor:pointer':'opacity:0.5'}" ${c>0?`onclick="showPlaqTierModal('mensal','${t.label}','${t.icon}')"`:''}>
               <div style="font-size:11px;color:var(--text3)">${t.icon} ${t.label}</div>
               <div style="font-size:22px;font-weight:700;color:${c>0?'var(--yellow)':'var(--text3)'}">${c}</div>
             </div>`;
@@ -3044,6 +3044,98 @@ function openResumoAluno(email) {
       </div>
     </div>
   `;
+  document.body.appendChild(modal);
+}
+
+function showPlaqTierModal(type, label, icon) {
+  const fmt = v => `R$ ${v.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}`;
+  const students = [];
+
+  for (const [email, p] of Object.entries(STATE.plaquinhas || {})) {
+    if (!p || !p.extratos?.length) continue;
+
+    if (type === 'total') {
+      if (p.plaq_total === label) {
+        students.push({
+          nome: p.nome || email,
+          email: email,
+          valor: p.fat_total || 0,
+          detalhe: fmt(p.fat_total || 0)
+        });
+      }
+    } else {
+      // mensal: check each plaq_mensais entry
+      if (p.plaq_mensais && p.plaq_mensais.length > 0) {
+        p.plaq_mensais.forEach(m => {
+          if (m.tier.label === label) {
+            const monthNames = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+            const mLabels = m.months.map(mo => {
+              const [y, mm] = mo.split('-');
+              return `${monthNames[parseInt(mm)]}/${y}`;
+            }).join(', ');
+            students.push({
+              nome: p.nome || email,
+              email: email,
+              valor: m.value || 0,
+              detalhe: `${fmt(m.value || 0)} (${mLabels})`
+            });
+          }
+        });
+      }
+    }
+  }
+
+  students.sort((a, b) => b.valor - a.valor);
+
+  const titleType = type === 'total' ? 'Faturamento Total' : 'Faturamento Mensal';
+  const borderColor = type === 'total' ? 'rgba(99,102,241,0.4)' : 'rgba(245,158,11,0.4)';
+  const badgeBg = type === 'total' ? 'rgba(99,102,241,0.15)' : 'rgba(245,158,11,0.15)';
+  const badgeColor = type === 'total' ? 'var(--accent2)' : 'var(--yellow)';
+
+  let rows = '';
+  students.forEach((s, i) => {
+    rows += `<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:8px 12px;font-size:12px;color:var(--text3)">${i+1}</td>
+      <td style="padding:8px 12px;font-size:13px">${s.nome}</td>
+      <td style="padding:8px 12px;font-size:11px;color:var(--text3)">${s.email}</td>
+      <td style="padding:8px 12px;font-size:12px;text-align:right;font-variant-numeric:tabular-nums">${s.detalhe}</td>
+    </tr>`;
+  });
+
+  const modal = document.createElement('div');
+  modal.id = 'tier-modal';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  modal.innerHTML = `
+    <div style="background:var(--bg2);border:1px solid ${borderColor};border-radius:12px;max-width:700px;width:100%;max-height:85vh;overflow-y:auto;padding:28px;position:relative">
+      <button onclick="document.getElementById('tier-modal').remove()" style="position:absolute;top:12px;right:16px;background:none;border:none;color:var(--text3);font-size:22px;cursor:pointer">✕</button>
+
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
+        <span style="font-size:28px">${icon}</span>
+        <h2 style="margin:0;font-size:18px">Plaquinha ${label}</h2>
+      </div>
+      <p style="margin:0 0 20px;font-size:12px;color:var(--text3)">${titleType} · ${students.length} aluno${students.length!==1?'s':''}</p>
+
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="border-bottom:2px solid var(--border)">
+            <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--text3)">#</th>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--text3)">Nome</th>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--text3)">E-mail</th>
+            <th style="padding:8px 12px;text-align:right;font-size:11px;color:var(--text3)">${type === 'total' ? 'Fat. Total' : 'Valor / Mês'}</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+
+      ${students.length === 0 ? '<p style="text-align:center;color:var(--text3);padding:20px">Nenhum aluno neste tier</p>' : ''}
+    </div>
+  `;
+
+  // Remove previous modal if exists
+  const prev = document.getElementById('tier-modal');
+  if (prev) prev.remove();
+
   document.body.appendChild(modal);
 }
 
