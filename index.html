@@ -1018,11 +1018,44 @@ async function ocrPDFPages(pdf) {
   return fullText;
 }
 
+async function preprocessImage(file) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const scale = Math.max(1, 2000 / Math.max(img.width, img.height));
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const d = imageData.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const gray = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2];
+        const contrast = ((gray / 255 - 0.5) * 1.8 + 0.5) * 255;
+        const val = contrast < 128 ? 0 : 255;
+        d[i] = d[i+1] = d[i+2] = val;
+      }
+      ctx.putImageData(imageData, 0, 0);
+      canvas.toBlob(blob => resolve(blob), 'image/png');
+    };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
 async function extractImageText(file) {
   const worker = await Tesseract.createWorker('por');
   try {
-    const { data } = await worker.recognize(file);
-    return data.text;
+    // Try with preprocessed image first (better for dark backgrounds)
+    const processed = await preprocessImage(file);
+    const { data: d1 } = await worker.recognize(processed);
+    // Also try raw image
+    const { data: d2 } = await worker.recognize(file);
+    // Pick whichever found more R$ values (better parse)
+    const countR = (t) => (t.match(/R\s*\$\s*[\d.,]+/g) || []).length;
+    const text = countR(d1.text) >= countR(d2.text) ? d1.text : d2.text;
+    console.log('[OCR] preprocessed R$ count:', countR(d1.text), 'raw R$ count:', countR(d2.text));
+    return text;
   } finally {
     await worker.terminate();
   }
@@ -1073,15 +1106,22 @@ function detectBankAndParse(text, filename) {
   }
 
   // 2. Check if it's a payment receipt (comprovante) — Pix, Asaas, etc.
+  // OCR-tolerant: allow flexible spacing, common OCR errors (ê→e, ã→a, ç→c)
   const isComprovante = /Comprovante\s+de\s+(pagamento|transfer[êe]ncia)/i.test(text) ||
                         /Valor\s+pago.*Data\s+da\s+confirma/is.test(text) ||
                         /Pix\s+(conclu[ií]do|Enviado)/i.test(text) ||
                         /Comprovante\s+(do\s+)?Pix/i.test(text) ||
-                        /Comprovante\s+BB/i.test(text);
+                        /Comprovante\s+BB/i.test(text) ||
+                        /pagamento\s+(efetuado|realizado|confirmado)/i.test(text) ||
+                        /cart[aã]o\s+de\s+cr[ée]dito/i.test(text) ||
+                        /transfer[eê]ncia\s+Pix/i.test(text) ||
+                        /Valor\s*:?\s*R\s*\$.*Data/is.test(text) ||
+                        /pagamento.*cart[aã]o.*cr[eé]dito/is.test(text) ||
+                        /seu\s+pagamento.*foi\s+(realizado|confirmado|efetuado)/is.test(text);
 
   if (isComprovante) {
     let banco = 'Comprovante';
-    if (/Asaas/i.test(text)) banco = 'Asaas';
+    if (/Asaas|asaas\.com/i.test(text)) banco = 'Asaas';
     else if (/PagSeguro/i.test(text)) banco = 'PagSeguro';
     else if (/Mercado\s*Pago/i.test(text)) banco = 'MercadoPago';
     else if (/SANTANDER/i.test(text)) banco = 'Santander';
@@ -1089,7 +1129,7 @@ function detectBankAndParse(text, filename) {
     else if (/Comprovante\s+BB|BCO DO BRASIL/i.test(text)) banco = 'BB';
     else if (/SICOOB/i.test(text)) banco = 'Sicoob';
     else if (/ITA[ÚU]/i.test(text)) banco = 'Itaú';
-    else if (/INTER/i.test(text)) banco = 'Inter';
+    else if (/INTER|bancointer/i.test(text)) banco = 'Inter';
 
     const parsed = parseComprovante(text);
     const dates = parsed.details?.map(d => d.data) || [];
@@ -1340,33 +1380,48 @@ function parseComprovante(text) {
 
   // Strategy: find VALUE and DATE from the document
 
-  // --- Find VALUE ---
+  // --- Find VALUE (OCR-tolerant) ---
   let valor = 0;
   // 1. "Valor pago: R$ X" or "Valor pago R$ X" (Asaas, Santander)
-  let valMatch = text.match(/Valor\s+pago\s*:?\s*R\$\s*([\d.,]+)/i);
+  let valMatch = text.match(/Valor\s+pago\s*:?\s*R\s*\$\s*([\d.,]+)/i);
   // 2. "Valor: R$ X" (Bradesco Pix)
-  if (!valMatch) valMatch = text.match(/Valor\s*:\s*R\$\s*([\d.,]+)/i);
-  // 3. "R$ X" right after "Pix Enviado" (BB)
-  if (!valMatch) valMatch = text.match(/Pix\s+Enviado\s*R\$\s*([\d.,]+)/i);
-  // 4. Just the first R$ value found
-  if (!valMatch) valMatch = text.match(/R\$\s*([\d.,]+)/i);
+  if (!valMatch) valMatch = text.match(/Valor\s*:?\s*R\s*\$\s*([\d.,]+)/i);
+  // 3. "valor de R$ X" (Asaas credit card)
+  if (!valMatch) valMatch = text.match(/valor\s+de\s+R\s*\$\s*([\d.,]+)/i);
+  // 4. "R$ X" right after "Pix Enviado" (BB)
+  if (!valMatch) valMatch = text.match(/Pix\s+Enviado\s*R\s*\$\s*([\d.,]+)/i);
+  // 5. "R$ X,XX" with OCR spacing tolerance (R $ 810,00 or R$810,00)
+  if (!valMatch) valMatch = text.match(/R\s*\$\s*([\d.,]+)/i);
+  // 6. Last resort: look for "X.XXX,XX" or "XXX,XX" pattern (common amount format)
+  if (!valMatch) {
+    const amounts = [...text.matchAll(/(\d{1,3}(?:\.\d{3})*,\d{2})/g)];
+    if (amounts.length > 0) {
+      // Use the first reasonable amount
+      for (const am of amounts) {
+        const v = parseFloat(am[1].replace(/\./g, '').replace(',', '.'));
+        if (v >= 10 && v < 1000000) { valMatch = am; break; }
+      }
+    }
+  }
 
   if (valMatch) {
     valor = parseFloat(valMatch[1].replace(/\./g, '').replace(',', '.'));
   }
 
-  // --- Find DATE ---
+  // --- Find DATE (OCR-tolerant) ---
   let dateStr = null, dd = '', mm = '', yyyy = '';
-  // 1. "Data da confirmação: DD/MM/YYYY" (Asaas)
-  let dateMatch = text.match(/Data\s+da\s+confirma[çc][ãa]o\s*:?\s*(\d{2})\/(\d{2})\/(\d{4})/i);
+  // 1. "Data da confirmação: DD/MM/YYYY" (Asaas) — allow OCR errors in accents
+  let dateMatch = text.match(/Data\s+da\s+confirma[çc][ãa]o\s*:?\s*(\d{2})\s*\/\s*(\d{2})\s*\/\s*(\d{4})/i);
   // 2. "Data e Hora: DD/MM/YYYY" (Bradesco, generic)
-  if (!dateMatch) dateMatch = text.match(/Data\s+e\s+Hora\s*:\s*(\d{2})\/(\d{2})\/(\d{4})/i);
+  if (!dateMatch) dateMatch = text.match(/Data\s+e\s+Hora\s*:\s*(\d{2})\s*\/\s*(\d{2})\s*\/\s*(\d{4})/i);
   // 3. "Data do débito: DD/MM/YYYY"
-  if (!dateMatch) dateMatch = text.match(/Data\s+do\s+d[ée]bito\s*:\s*(\d{2})\/(\d{2})\/(\d{4})/i);
+  if (!dateMatch) dateMatch = text.match(/Data\s+do\s+d[ée]bito\s*:\s*(\d{2})\s*\/\s*(\d{2})\s*\/\s*(\d{4})/i);
   // 4. Date at top of Santander format: "DD/MM/YYYY - HH:MM:SS"
-  if (!dateMatch) dateMatch = text.match(/(\d{2})\/(\d{2})\/(\d{4})\s*-\s*\d{2}:\d{2}/);
-  // 5. Fallback: first date found
-  if (!dateMatch) dateMatch = text.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  if (!dateMatch) dateMatch = text.match(/(\d{2})\s*\/\s*(\d{2})\s*\/\s*(\d{4})\s*-\s*\d{2}:\d{2}/);
+  // 5. "gerado em DD/MM/YYYY" (Asaas comprovante)
+  if (!dateMatch) dateMatch = text.match(/gerado\s+em\s+(\d{2})\s*\/\s*(\d{2})\s*\/\s*(\d{4})/i);
+  // 6. Fallback: first date found (allow spaces around slashes from OCR)
+  if (!dateMatch) dateMatch = text.match(/(\d{2})\s*\/\s*(\d{2})\s*\/\s*(\d{4})/);
 
   if (dateMatch) {
     dd = dateMatch[1]; mm = dateMatch[2]; yyyy = dateMatch[3];
