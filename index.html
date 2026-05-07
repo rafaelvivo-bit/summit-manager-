@@ -1684,12 +1684,35 @@ function parseGeneric(text, filename) {
     }
   }
 
-  // ── Strategy 3: REMOVED aggressive sum-all-R$ ──
-  // Previously this summed ALL R$ values in the document when no structured entries
-  // were found — this caused massive over-counting with bank statement screenshots
-  // (saldo values, dates, etc. were included). Now we just warn the user.
+  // ── Strategy 3: Conservative R$ extraction for simple comprovantes ──
+  // Only activates when very few R$ values exist (≤5) — safe for single receipts.
+  // Bank statements with many values will NOT trigger this (prevents saldo inflation).
   if (Object.keys(entradas).length === 0) {
-    warnings.push('Nenhuma entrada encontrada automaticamente — adicione os valores manualmente');
+    const monthKey = findFirstMonth(text);
+    if (monthKey) {
+      const validValues = [];
+      for (const line of lines) {
+        if (SKIP_LINE.test(line)) continue;
+        if (DEBIT_KEYWORDS.test(line)) continue;
+        const rMatches = [...line.matchAll(/R\$\s*([\d.,]+)/g)];
+        for (const rm of rMatches) {
+          const v = parseFloat(rm[1].replace(/\./g, '').replace(',', '.'));
+          if (v > 0 && v < 1000000) validValues.push(v);
+        }
+      }
+      if (validValues.length > 0 && validValues.length <= 5) {
+        // Few values = likely a comprovante, use the largest value
+        const maxVal = Math.max(...validValues);
+        entradas[monthKey] = maxVal;
+        warnings.push('Valor extraído automaticamente (maior R$ encontrado) — revise manualmente');
+      } else if (validValues.length > 5) {
+        warnings.push('Muitos valores detectados — adicione manualmente para evitar erro');
+      } else {
+        warnings.push('Nenhuma entrada encontrada — adicione os valores manualmente');
+      }
+    } else {
+      warnings.push('Nenhuma data ou entrada encontrada — adicione os valores manualmente');
+    }
   }
 
   if (Object.keys(entradas).length === 0) {
