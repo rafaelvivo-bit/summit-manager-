@@ -3190,6 +3190,11 @@ function exportData() {
   // Plaquinhas
   const plaqData = STATE.summit.filter(p=>p.segmento==='Aluno').map((p,i) => {
     const plaq = STATE.plaquinhas[p.email] || {};
+    const conquistadas = [];
+    if (plaq.plaq_total && plaq.plaq_total !== '—') conquistadas.push(`Total: ${plaq.plaq_total}`);
+    if (plaq.plaq_mensal_labels && plaq.plaq_mensal_labels.length > 0) {
+      plaq.plaq_mensal_labels.forEach(l => conquistadas.push(`Mensal: ${l}`));
+    }
     return {
       '#': i+1, Nome: p.nome, Email: p.email, Programa: p.programa,
       Tier: p.tierMax,
@@ -3199,7 +3204,9 @@ function exportData() {
       'Plaq. Total': plaq.plaq_total || '—',
       'Maior Mês': plaq.fat_maior_mes || 0,
       'Plaq. Mensal': (plaq.plaq_mensal_labels || []).join(' + ') || '—',
-      'Qtd Plaq. Mensais': plaq.qtd_plaquinhas_mensais || 0
+      'Qtd Plaq. Mensais': plaq.qtd_plaquinhas_mensais || 0,
+      'Plaquinhas Conquistadas': conquistadas.join(' | ') || 'Nenhuma',
+      'Total de Plaquinhas': (plaq.plaq_total && plaq.plaq_total !== '—' ? 1 : 0) + (plaq.qtd_plaquinhas_mensais || 0)
     };
   });
   if (plaqData.length) {
