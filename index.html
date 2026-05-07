@@ -1898,25 +1898,30 @@ function openPDFUploadForAluno(email) {
     for (let fi = 0; fi < files.length; fi++) {
       const file = files[fi];
       try {
-        toast(`Processando ${fi + 1}/${files.length}: ${file.name}${file.type.startsWith('image/') ? ' (OCR)' : ''}...`);
+        const isImage = file.type.startsWith('image/') || /\.(jpg|jpeg|png)$/i.test(file.name);
+        toast(`Processando ${fi + 1}/${files.length}: ${file.name}${isImage ? ' (OCR)' : ''}...`);
         let text;
-        if (file.type.startsWith('image/') || /\.(jpg|jpeg|png)$/i.test(file.name)) {
+        if (isImage) {
           text = await extractImageText(file);
         } else {
           text = await extractPDFText(file);
         }
         let result = detectBankAndParse(text, file.name);
         result.filename = file.name;
+        // Store image preview URL for unreadable images
+        if (isImage) {
+          result._imageUrl = URL.createObjectURL(file);
+        }
         // If no data from content, try parsing the filename as fallback
         if (result.total_liquido === 0 && (!result.details || result.details.length === 0)) {
           const fnResult = parseFilename(file.name);
           if (fnResult) {
             fnResult.filename = file.name;
             fnResult.banco = result.banco !== 'Desconhecido' ? result.banco : 'Arquivo';
+            if (isImage) fnResult._imageUrl = result._imageUrl;
             result = fnResult;
           }
-          // Don't mark as _noData — let it through to the modal with a warning
-          // so the user can add values manually
+          result._unread = true;
         }
         results.push(result);
       } catch (err) {
@@ -1967,8 +1972,8 @@ function aggregateResults(results) {
     if (r.titular) titulares.add(r.titular);
 
     // Track files with no data (warn but don't skip — user can fill manually)
-    if (r._noData || (r.total_liquido === 0 && (!r.details || r.details.length === 0) && Object.keys(r.meses || {}).length === 0)) {
-      failedFiles.push(r.filename || '?');
+    if (r._unread || r._noData || (r.total_liquido === 0 && (!r.details || r.details.length === 0) && Object.keys(r.meses || {}).length === 0)) {
+      failedFiles.push({ name: r.filename || '?', imageUrl: r._imageUrl || null });
       // Don't skip — let it contribute its (possibly empty) data
     }
 
@@ -2004,8 +2009,9 @@ function aggregateResults(results) {
   if (dupCount > 0) {
     allWarnings.unshift(`${dupCount} arquivo(s) duplicado(s) ignorado(s): ${dupFiles.join(', ')}`);
   }
+  const unreadPreviews = failedFiles.filter(f => f.imageUrl);
   if (failedFiles.length > 0) {
-    allWarnings.unshift(`${failedFiles.length} arquivo(s) não lido(s) — adicione manualmente: ${failedFiles.join(', ')}`);
+    allWarnings.unshift(`${failedFiles.length} arquivo(s) não lido(s) — ${unreadPreviews.length > 0 ? 'veja o preview abaixo e ' : ''}adicione manualmente`);
   }
 
   // Compute líquido
@@ -2040,7 +2046,9 @@ function aggregateResults(results) {
     details: allDetails,
     isComprovante: results.some(r => r.isComprovante),
     filename: `${results.length} arquivos (${filenames.join(', ')})`,
-    _files: filenames
+    _files: filenames,
+    _unreadPreviews: unreadPreviews,
+    _imageUrl: results.find(r => r._imageUrl)?._imageUrl
   };
 }
 
@@ -2057,6 +2065,23 @@ function showPDFReviewModal(email, result) {
       const isFailedFile = w.includes('não lido');
       return `<div class="pdf-status warn" style="${isFailedFile ? 'background:rgba(239,68,68,.2);border:1px solid var(--red);color:var(--red);font-weight:600' : ''}">⚠ ${w}</div>`;
     }).join('');
+  }
+
+  // Preview images for unread files
+  let previewHTML = '';
+  const previews = result._unreadPreviews || [];
+  const singlePreview = !previews.length && result._imageUrl && result._unread;
+  if (previews.length > 0 || singlePreview) {
+    const imgs = singlePreview ? [{ name: result.filename, imageUrl: result._imageUrl }] : previews;
+    previewHTML = `<div style="margin:12px 0">
+      <h3 style="margin-bottom:8px;font-size:13px;color:var(--yellow)">📷 Arquivo(s) não lido(s) — veja e adicione o valor manualmente</h3>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;max-height:300px;overflow-y:auto">
+        ${imgs.map(p => `<div style="flex:1;min-width:180px;max-width:280px;background:var(--bg);border-radius:8px;overflow:hidden;border:1px solid var(--border)">
+          <img src="${p.imageUrl}" style="width:100%;max-height:250px;object-fit:contain;cursor:pointer" onclick="window.open('${p.imageUrl}','_blank')" title="Clique para ampliar">
+          <div style="padding:6px;font-size:10px;color:var(--text3);text-align:center">${p.name}</div>
+        </div>`).join('')}
+      </div>
+    </div>`;
   }
 
   let monthsHTML = '';
@@ -2116,6 +2141,7 @@ function showPDFReviewModal(email, result) {
       </div>
 
       ${warningHTML}
+      ${previewHTML}
 
       ${result.details && result.details.length > 0 ? `
       <div style="margin-bottom:12px">
