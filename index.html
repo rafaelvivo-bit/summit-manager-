@@ -1018,75 +1018,58 @@ async function ocrPDFPages(pdf) {
   return fullText;
 }
 
-function prepareImageCanvas(file) {
+async function preprocessImage(file) {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
-      const scale = Math.max(1, 2400 / Math.max(img.width, img.height));
+      const scale = Math.max(1.5, 3000 / Math.max(img.width, img.height));
       canvas.width = Math.round(img.width * scale);
       canvas.height = Math.round(img.height * scale);
       const ctx = canvas.getContext('2d');
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      resolve({ canvas, ctx });
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const d = imageData.data;
+      let darkPixels = 0;
+      const total = d.length / 4;
+      for (let i = 0; i < d.length; i += 4) {
+        const gray = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2];
+        if (gray < 100) darkPixels++;
+      }
+      const isDark = darkPixels > total * 0.5;
+      for (let i = 0; i < d.length; i += 4) {
+        let gray = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2];
+        if (isDark) gray = 255 - gray;
+        d[i] = d[i+1] = d[i+2] = Math.max(0, Math.min(255, gray));
+      }
+      ctx.putImageData(imageData, 0, 0);
+      canvas.toBlob(blob => resolve(blob), 'image/png');
     };
     img.src = URL.createObjectURL(file);
   });
 }
 
-function canvasToBlob(canvas) {
-  return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
-}
-
-async function preprocessImage(file, invert) {
-  const { canvas, ctx } = await prepareImageCanvas(file);
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const d = imageData.data;
-  let darkPixels = 0;
-  for (let i = 0; i < d.length; i += 4) {
-    let gray = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2];
-    if (gray < 128) darkPixels++;
-  }
-  const isDark = invert !== undefined ? invert : (darkPixels > d.length / 4 * 0.6);
-  for (let i = 0; i < d.length; i += 4) {
-    let gray = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2];
-    if (isDark) gray = 255 - gray;
-    const contrast = ((gray / 255 - 0.5) * 2.0 + 0.5) * 255;
-    const val = Math.max(0, Math.min(255, contrast)) < 140 ? 0 : 255;
-    d[i] = d[i+1] = d[i+2] = val;
-  }
-  ctx.putImageData(imageData, 0, 0);
-  return canvasToBlob(canvas);
-}
-
 async function extractImageText(file) {
   const worker = await Tesseract.createWorker('por');
   try {
+    // Pass 1: preprocessed (upscaled, grayscale, inverted if dark)
+    const processed = await preprocessImage(file);
+    const { data: d1 } = await worker.recognize(processed);
+    // Pass 2: raw image
+    const { data: d2 } = await worker.recognize(file);
     const countUseful = (t) => {
       const rCount = (t.match(/R\s*\$\s*[\d.,]+/g) || []).length;
-      const dateCount = (t.match(/\d{2}\s*\/\s*\d{2}\s*\/\s*\d{4}/g) || []).length;
-      const wordCount = (t.match(/[A-Za-zÀ-ú]{3,}/g) || []).length;
+      const dateCount = (t.match(/\d{2}\s*[\/\-]\s*\d{2}\s*[\/\-]\s*\d{4}/g) || []).length;
+      const wordCount = (t.match(/[A-Za-zÀ-ú]{4,}/g) || []).length;
       return rCount * 10 + dateCount * 5 + wordCount;
     };
-
-    // Pass 1: raw image
-    const { data: d1 } = await worker.recognize(file);
-    // Pass 2: preprocessed (auto-detect dark/light, apply accordingly)
-    const processed = await preprocessImage(file);
-    const { data: d2 } = await worker.recognize(processed);
-    // Pass 3: forced inverted (for dark-mode screenshots)
-    const inverted = await preprocessImage(file, true);
-    const { data: d3 } = await worker.recognize(inverted);
-
-    const scores = [
-      { text: d1.text, score: countUseful(d1.text), label: 'raw' },
-      { text: d2.text, score: countUseful(d2.text), label: 'processed' },
-      { text: d3.text, score: countUseful(d3.text), label: 'inverted' }
-    ];
-    scores.sort((a, b) => b.score - a.score);
-    console.log('[OCR] scores:', scores.map(s => `${s.label}=${s.score}`).join(', '));
-    console.log('[OCR] best:', scores[0].label, '| text:', scores[0].text.substring(0, 300));
-    return scores[0].text;
+    const s1 = countUseful(d1.text), s2 = countUseful(d2.text);
+    console.log('[OCR] processed score:', s1, '| raw score:', s2);
+    const best = s1 >= s2 ? d1.text : d2.text;
+    console.log('[OCR] text:', best.substring(0, 500));
+    return best;
   } finally {
     await worker.terminate();
   }
