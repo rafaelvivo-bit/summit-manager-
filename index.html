@@ -169,7 +169,7 @@ tr.row-outro td { color:#34d399; }
 <!-- APP -->
 <div class="app" id="app">
   <div class="topbar">
-    <h1>Summit <span>NSF 2026</span> <span style="font-size:12px;color:#ff6;font-weight:700">v12</span></h1>
+    <h1>Summit <span>NSF 2026</span> <span style="font-size:12px;color:#ff6;font-weight:700">v13</span></h1>
     <div class="topbar-actions">
       <label title="Upload BC Summit (.csv)">
         📋 BC Summit
@@ -1604,11 +1604,11 @@ function parseGeneric(text, filename) {
   let currentMonth = null;
   const lines = text.split('\n');
 
-  const SKIP_LINE = /SALDO\s+(ANTERIOR|ATUAL|FINAL|INICI|do\s+dia|em\s|total|dispon|bloque|da\s+conta)|Limite|Taxa\s+de\s+juros|Vencimento|CET.*Anual|IOF|Tarifas\s+Pend|CPMF|Juros\s+(Cheque|adiant)|cheque\s+especial|Fale\s+com|SAC:|Ouvidoria:|0800|Saldo\s+(disponível|bloqueado|de\s+investimento)|Per[ií]odo\s*:|Categorias:|Solicitado\s+em|Central\s+de\s+(Ajuda|Relacionamento)|P[áa]gina\s+\d|bloqueado\s*\+\s*dispon|N[ãa]o\s+h[áa]\s+linhas|Valores\s+sujeitos|opera[çc][õo]es\s+de\s+cr[ée]dito|EXTRATO\s+DE\s+CONTA|COOPERATIVA|CLIENTE:|USU[ÁA]RIO:|CONTA:/i;
+  const SKIP_LINE = /Saldo\s+R\$|SALDO\s+(ANTERIOR|ATUAL|FINAL|INICI|do\s+dia|em\s|total|dispon|bloque|da\s+conta)|^Saldo\b|Saldo\s+[\d.,]+|Limite|Taxa\s+de\s+juros|Vencimento|CET.*Anual|IOF|Tarifas\s+Pend|CPMF|Juros\s+(Cheque|adiant)|cheque\s+especial|Fale\s+com|SAC:|Ouvidoria:|0800|Saldo\s+(disponível|bloqueado|de\s+investimento)|Per[ií]odo\s*:|Categorias:|Solicitado\s+em|Central\s+de\s+(Ajuda|Relacionamento)|P[áa]gina\s+\d|bloqueado\s*\+\s*dispon|N[ãa]o\s+h[áa]\s+linhas|Valores\s+sujeitos|opera[çc][õo]es\s+de\s+cr[ée]dito|EXTRATO\s+DE\s+CONTA|COOPERATIVA|CLIENTE:|USU[ÁA]RIO:|CONTA:|Pix\s+recebido\s+devolvido/i;
 
-  const CREDIT_KEYWORDS = /Pix\s+recebido|RECEBIMENTO|PIX_CRED|CRED\s*DOM|CR[ÉE]DITO|Dep[óo]sito\s+(?:de\s+)?vendas|Dep[óo]sito\s+InfinitePay|Vendas\s+Dep|Transfer[êe]ncia\s+recebida|TED\s+recebida|TED\s+CRED|DOC\s+recebido|Resgate|REND\s+POUP|Devolu[çc][ãa]o/i;
+  const CREDIT_KEYWORDS = /Pix\s+recebido(?!\s+devolvido)|RECEBIMENTO|PIX_CRED|CRED\s*DOM|CR[ÉE]DITO|Dep[óo]sito\s+(?:de\s+)?vendas|Dep[óo]sito\s+InfinitePay|Vendas\s+Dep|Transfer[êe]ncia\s+recebida|TED\s+recebida|TED\s+CRED|DOC\s+recebido|Resgate|REND\s+POUP|Devolu[çc][ãa]o/i;
 
-  const DEBIT_KEYWORDS = /PAGAMENTO|PAG\s+TIT|PIX_DEB|Pix\s+enviado|Enviado|D[ÉE]BITO|Transfer[êe]ncia\s+enviada|LIQUIDACAO|INTEGR\s+PARC|CUSTO\s+ALUGUEL|PJ\s+CONTA|TARIFA|TAR\s+|IOF\s|IMPOSTO|IR\s+S\/|CPMF|DEB\s+|Compra\s+no|COMPRA\s/i;
+  const DEBIT_KEYWORDS = /PAGAMENTO|PAG\s+TIT|PIX_DEB|Pix\s+enviado|Pix\s+recebido\s+devolvido|Enviado|D[ÉE]BITO|Transfer[êe]ncia\s+enviada|LIQUIDACAO|INTEGR\s+PARC|CUSTO\s+ALUGUEL|PJ\s+CONTA|TARIFA|TAR\s+|IOF\s|IMPOSTO|IR\s+S\/|CPMF|DEB\s+|Compra\s+no|COMPRA\s/i;
 
   // Pass A+B+C combined in single loop for efficiency
   for (const line of lines) {
@@ -1684,26 +1684,12 @@ function parseGeneric(text, filename) {
     }
   }
 
-  // ── Strategy 3: Filename-based month + sum all R$ in document ──
+  // ── Strategy 3: REMOVED aggressive sum-all-R$ ──
+  // Previously this summed ALL R$ values in the document when no structured entries
+  // were found — this caused massive over-counting with bank statement screenshots
+  // (saldo values, dates, etc. were included). Now we just warn the user.
   if (Object.keys(entradas).length === 0) {
-    const monthKey = findFirstMonth(text);
-    if (monthKey) {
-      // Sum all R$ values, excluding obvious saldo/summary lines
-      let sum = 0;
-      let count = 0;
-      for (const line of lines) {
-        if (SKIP_LINE.test(line)) continue;
-        const rMatches = [...line.matchAll(/R\$\s*([\d.,]+)/g)];
-        for (const rm of rMatches) {
-          const v = parseFloat(rm[1].replace(/\./g, '').replace(',', '.'));
-          if (v > 0 && v < 1000000) { sum += v; count++; }
-        }
-      }
-      if (sum > 0 && count <= 500) {
-        entradas[monthKey] = sum;
-        warnings.push('Soma de todos os R$ do documento — revise manualmente');
-      }
-    }
+    warnings.push('Nenhuma entrada encontrada automaticamente — adicione os valores manualmente');
   }
 
   if (Object.keys(entradas).length === 0) {
