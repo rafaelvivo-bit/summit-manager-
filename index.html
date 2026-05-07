@@ -3010,13 +3010,214 @@ function renderPlaquinhas() {
       })()}</td>
       <td style="text-align:center;white-space:nowrap">
         ${hasExtrato ? `<button onclick="openResumoAluno('${a.email}')" style="padding:4px 10px;background:var(--accent2);color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;margin-right:4px">📊 Resumo</button>` : ''}
-        <button onclick="openPDFUploadForAluno('${a.email}')" style="padding:4px 10px;background:var(--accent);color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer">📄 Anexar Comprovante</button>
+        <button onclick="openPDFUploadForAluno('${a.email}')" style="padding:4px 10px;background:var(--accent);color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer">📄 Anexar</button>
+        <button onclick="openManualValidation('${a.email}')" style="padding:4px 10px;background:rgba(34,197,94,0.2);color:var(--green);border:1px solid rgba(34,197,94,0.3);border-radius:4px;font-size:11px;cursor:pointer">✍️ Manual</button>
       </td>
     </tr>`;
   });
 
   html += '</tbody></table></div>';
   document.getElementById('panel-plaquinhas').innerHTML = html;
+}
+
+function openManualValidation(email) {
+  const aluno = STATE.summit.find(p => p.email === email);
+  const nome = aluno ? aluno.nome : email;
+
+  // Check if already has manual extrato — pre-fill if so
+  const plaq = STATE.plaquinhas[email];
+  const existingManual = plaq?.extratos?.find(e => e.banco === 'Manual');
+  const prefill = existingManual ? Object.entries(existingManual.meses).sort(([a],[b]) => a.localeCompare(b)) : [];
+
+  const modal = document.createElement('div');
+  modal.id = 'manual-val-modal';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+
+  const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const years = ['2024','2025','2026'];
+
+  function buildRow(prefillMonth, prefillValue) {
+    const [pY, pM] = prefillMonth ? prefillMonth.split('-') : ['',''];
+    const monthOpts = months.map((m, i) => {
+      const val = String(i+1).padStart(2,'0');
+      return `<option value="${val}" ${val===pM?'selected':''}>${m}</option>`;
+    }).join('');
+    const yearOpts = years.map(y => `<option value="${y}" ${y===pY?'selected':''}>${y}</option>`).join('');
+    const valStr = prefillValue ? prefillValue.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) : '';
+    return `<div class="manual-row" style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+      <select class="mv-month" style="padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px">
+        <option value="">Mês</option>${monthOpts}
+      </select>
+      <select class="mv-year" style="padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px">
+        ${yearOpts}
+      </select>
+      <input type="text" class="mv-value" placeholder="Valor (ex: 15000,00)" value="${valStr}" style="flex:1;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px">
+      <button onclick="this.closest('.manual-row').remove();updateManualTotal()" style="background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;padding:4px 8px">×</button>
+    </div>`;
+  }
+
+  const prefillRows = prefill.length > 0
+    ? prefill.map(([m, v]) => buildRow(m, v)).join('')
+    : buildRow('', null);
+
+  modal.innerHTML = `
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;max-width:550px;width:100%;max-height:85vh;overflow-y:auto;padding:28px;position:relative">
+      <button onclick="document.getElementById('manual-val-modal').remove()" style="position:absolute;top:12px;right:16px;background:none;border:none;color:var(--text3);font-size:22px;cursor:pointer">✕</button>
+
+      <h2 style="margin:0 0 4px;font-size:18px">✍️ Validação Manual</h2>
+      <p style="margin:0 0 20px;font-size:12px;color:var(--text3)">${nome} · ${email}</p>
+
+      ${existingManual ? '<div style="background:rgba(234,179,8,0.1);border:1px solid rgba(234,179,8,0.3);border-radius:8px;padding:10px;margin-bottom:16px;font-size:12px;color:var(--yellow)">⚠ Já existe uma validação manual. Os valores abaixo substituirão a anterior.</div>' : ''}
+
+      <div id="manual-rows">
+        ${prefillRows}
+      </div>
+
+      <button onclick="addManualRow()" style="padding:6px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;cursor:pointer;margin-bottom:20px">+ Adicionar Mês</button>
+
+      <div style="background:var(--bg);border-radius:8px;padding:14px;margin-bottom:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:13px;color:var(--text2)">Faturamento Total (manual):</span>
+          <span id="manual-total" style="font-size:18px;font-weight:700;color:var(--green)">R$ 0,00</span>
+        </div>
+        <div id="manual-plaq-preview" style="margin-top:8px;font-size:12px;color:var(--text3)"></div>
+      </div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button onclick="document.getElementById('manual-val-modal').remove()" style="padding:8px 20px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;cursor:pointer">Cancelar</button>
+        <button onclick="confirmManualValidation('${email}')" style="padding:8px 20px;background:var(--green);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">✅ Salvar</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  // Attach input listeners for live total
+  setTimeout(() => {
+    document.querySelectorAll('#manual-rows .mv-value').forEach(inp => {
+      inp.addEventListener('input', updateManualTotal);
+    });
+    updateManualTotal();
+  }, 50);
+}
+
+function addManualRow() {
+  const container = document.getElementById('manual-rows');
+  const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const years = ['2024','2025','2026'];
+  const monthOpts = months.map((m, i) => `<option value="${String(i+1).padStart(2,'0')}">${m}</option>`).join('');
+  const yearOpts = years.map(y => `<option value="${y}">${y}</option>`).join('');
+
+  const row = document.createElement('div');
+  row.className = 'manual-row';
+  row.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:8px';
+  row.innerHTML = `
+    <select class="mv-month" style="padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px">
+      <option value="">Mês</option>${monthOpts}
+    </select>
+    <select class="mv-year" style="padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px">
+      ${yearOpts}
+    </select>
+    <input type="text" class="mv-value" placeholder="Valor (ex: 15000,00)" style="flex:1;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px">
+    <button onclick="this.closest('.manual-row').remove();updateManualTotal()" style="background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;padding:4px 8px">×</button>
+  `;
+  container.appendChild(row);
+  row.querySelector('.mv-value').addEventListener('input', updateManualTotal);
+}
+
+function updateManualTotal() {
+  const rows = document.querySelectorAll('#manual-rows .manual-row');
+  let total = 0;
+  const meses = {};
+
+  rows.forEach(row => {
+    const month = row.querySelector('.mv-month').value;
+    const year = row.querySelector('.mv-year').value;
+    const rawVal = row.querySelector('.mv-value').value.replace(/\s/g,'').replace(/R\$/g,'').replace(/\./g,'').replace(',','.');
+    const val = parseFloat(rawVal) || 0;
+    if (month && year && val > 0) {
+      const key = `${year}-${month}`;
+      meses[key] = (meses[key] || 0) + val;
+      total += val;
+    }
+  });
+
+  const fmt = v => `R$ ${v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  document.getElementById('manual-total').textContent = fmt(total);
+
+  // Preview plaquinhas
+  let preview = '';
+  if (total > 0) {
+    const ptier = classifyPlaquinhaTotal(total);
+    preview += ptier ? `🏆 Fat. Total: ${ptier.label}` : '🏆 Fat. Total: —';
+
+    const mensais = classifyPlaquinhasMensaisAcumulo(meses);
+    if (mensais.length > 0) {
+      preview += ` · 💰 Mensal: ${mensais.map(m => m.tier.label).join(', ')}`;
+    }
+  }
+  document.getElementById('manual-plaq-preview').textContent = preview;
+}
+
+async function confirmManualValidation(email) {
+  const rows = document.querySelectorAll('#manual-rows .manual-row');
+  const meses = {};
+
+  rows.forEach(row => {
+    const month = row.querySelector('.mv-month').value;
+    const year = row.querySelector('.mv-year').value;
+    const rawVal = row.querySelector('.mv-value').value.replace(/\s/g,'').replace(/R\$/g,'').replace(/\./g,'').replace(',','.');
+    const val = parseFloat(rawVal) || 0;
+    if (month && year && val > 0) {
+      const key = `${year}-${month}`;
+      meses[key] = (meses[key] || 0) + val;
+    }
+  });
+
+  if (Object.keys(meses).length === 0) {
+    toast('Adicione pelo menos um mês com valor válido');
+    return;
+  }
+
+  // Initialize plaquinha entry if needed
+  if (!STATE.plaquinhas[email]) {
+    const aluno = STATE.summit.find(p => p.email === email);
+    STATE.plaquinhas[email] = {
+      nome: aluno ? aluno.nome : '',
+      extratos: []
+    };
+  }
+  const plaq = STATE.plaquinhas[email];
+  if (!plaq.extratos) plaq.extratos = [];
+
+  // Remove existing manual extrato if any (replace mode)
+  plaq.extratos = plaq.extratos.filter(e => e.banco !== 'Manual');
+
+  // Add manual extrato
+  const monthNames = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const sortedKeys = Object.keys(meses).sort();
+  const periodoStr = sortedKeys.length > 0
+    ? `${monthNames[parseInt(sortedKeys[0].split('-')[1])]}/${sortedKeys[0].split('-')[0]} - ${monthNames[parseInt(sortedKeys[sortedKeys.length-1].split('-')[1])]}/${sortedKeys[sortedKeys.length-1].split('-')[0]}`
+    : '';
+
+  plaq.extratos.push({
+    id: Date.now(),
+    filename: 'Validação Manual',
+    banco: 'Manual',
+    periodo: periodoStr,
+    meses: meses,
+    alertas: []
+  });
+
+  recalcAlunoPlaquinhas(email);
+
+  toast('Salvando...', 2000);
+  await saveState(true);
+
+  document.getElementById('manual-val-modal')?.remove();
+  toast(`✅ Validação manual salva para ${plaq.nome || email}`);
+  renderAll();
 }
 
 function openResumoAluno(email) {
