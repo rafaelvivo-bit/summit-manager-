@@ -3070,15 +3070,27 @@ function openResumoAluno(email) {
     }).join('');
   }
 
-  // Extratos list
+  // Extratos list + alertas
   let extratosHtml = '';
   if (extratos.length > 0) {
     extratosHtml = `<div style="margin-top:16px">
       <h4 style="margin:0 0 8px;font-size:13px;color:var(--text2)">Extratos Anexados (${extratos.length})</h4>
-      ${extratos.map((ext, i) => `<div style="background:var(--bg2);padding:6px 10px;border-radius:4px;margin-bottom:4px;font-size:11px;display:flex;justify-content:space-between;align-items:center">
-        <span>${ext.filename || `Extrato ${i+1}`}</span>
-        <span style="color:var(--text3)">${ext.banco || ''} ${ext.periodo || ''}</span>
-      </div>`).join('')}
+      ${extratos.map((ext, i) => {
+        const alertas = ext.alertas || [];
+        const hasAlert = alertas.length > 0;
+        return `<div style="background:var(--bg2);padding:6px 10px;border-radius:4px;margin-bottom:4px;font-size:11px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span>${ext.filename || `Extrato ${i+1}`}</span>
+            <span style="color:var(--text3)">${ext.banco || ''} ${ext.periodo || ''}</span>
+          </div>
+          ${hasAlert ? `<div style="margin-top:4px">${alertas.map(a => `<div style="font-size:10px;color:var(--yellow);padding:2px 0">⚠ ${a}</div>`).join('')}</div>` : ''}
+          ${ext.meses ? `<div style="margin-top:4px;font-size:10px;color:var(--text3)">${Object.entries(ext.meses).map(([m, v]) => {
+            const [y, mm] = m.split('-');
+            const mn = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+            return `${mn[parseInt(mm)]}/${y}: R$ ${v.toLocaleString('pt-BR',{minimumFractionDigits:2})}`;
+          }).join(' · ')}</div>` : ''}
+        </div>`;
+      }).join('')}
     </div>`;
   }
 
