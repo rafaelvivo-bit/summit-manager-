@@ -1845,9 +1845,9 @@ function openPDFUploadForAluno(email) {
             fnResult.filename = file.name;
             fnResult.banco = result.banco !== 'Desconhecido' ? result.banco : 'Arquivo';
             result = fnResult;
-          } else {
-            result._noData = true;
           }
+          // Don't mark as _noData — let it through to the modal with a warning
+          // so the user can add values manually
         }
         results.push(result);
       } catch (err) {
@@ -1897,10 +1897,10 @@ function aggregateResults(results) {
     bancos.add(r.banco);
     if (r.titular) titulares.add(r.titular);
 
-    // Track files with no data
-    if (r._noData) {
+    // Track files with no data (warn but don't skip — user can fill manually)
+    if (r._noData || (r.total_liquido === 0 && (!r.details || r.details.length === 0) && Object.keys(r.meses || {}).length === 0)) {
       failedFiles.push(r.filename || '?');
-      continue;
+      // Don't skip — let it contribute its (possibly empty) data
     }
 
     // Check for duplicate: same details (value + date) already seen
