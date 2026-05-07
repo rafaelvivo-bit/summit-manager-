@@ -1018,44 +1018,75 @@ async function ocrPDFPages(pdf) {
   return fullText;
 }
 
-async function preprocessImage(file) {
+function prepareImageCanvas(file) {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
-      const scale = Math.max(1, 2000 / Math.max(img.width, img.height));
-      canvas.width = img.width * scale;
-      canvas.height = img.height * scale;
+      const scale = Math.max(1, 2400 / Math.max(img.width, img.height));
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const d = imageData.data;
-      for (let i = 0; i < d.length; i += 4) {
-        const gray = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2];
-        const contrast = ((gray / 255 - 0.5) * 1.8 + 0.5) * 255;
-        const val = contrast < 128 ? 0 : 255;
-        d[i] = d[i+1] = d[i+2] = val;
-      }
-      ctx.putImageData(imageData, 0, 0);
-      canvas.toBlob(blob => resolve(blob), 'image/png');
+      resolve({ canvas, ctx });
     };
     img.src = URL.createObjectURL(file);
   });
 }
 
+function canvasToBlob(canvas) {
+  return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
+}
+
+async function preprocessImage(file, invert) {
+  const { canvas, ctx } = await prepareImageCanvas(file);
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const d = imageData.data;
+  let darkPixels = 0;
+  for (let i = 0; i < d.length; i += 4) {
+    let gray = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2];
+    if (gray < 128) darkPixels++;
+  }
+  const isDark = invert !== undefined ? invert : (darkPixels > d.length / 4 * 0.6);
+  for (let i = 0; i < d.length; i += 4) {
+    let gray = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2];
+    if (isDark) gray = 255 - gray;
+    const contrast = ((gray / 255 - 0.5) * 2.0 + 0.5) * 255;
+    const val = Math.max(0, Math.min(255, contrast)) < 140 ? 0 : 255;
+    d[i] = d[i+1] = d[i+2] = val;
+  }
+  ctx.putImageData(imageData, 0, 0);
+  return canvasToBlob(canvas);
+}
+
 async function extractImageText(file) {
   const worker = await Tesseract.createWorker('por');
   try {
-    // Try with preprocessed image first (better for dark backgrounds)
+    const countUseful = (t) => {
+      const rCount = (t.match(/R\s*\$\s*[\d.,]+/g) || []).length;
+      const dateCount = (t.match(/\d{2}\s*\/\s*\d{2}\s*\/\s*\d{4}/g) || []).length;
+      const wordCount = (t.match(/[A-Za-zÀ-ú]{3,}/g) || []).length;
+      return rCount * 10 + dateCount * 5 + wordCount;
+    };
+
+    // Pass 1: raw image
+    const { data: d1 } = await worker.recognize(file);
+    // Pass 2: preprocessed (auto-detect dark/light, apply accordingly)
     const processed = await preprocessImage(file);
-    const { data: d1 } = await worker.recognize(processed);
-    // Also try raw image
-    const { data: d2 } = await worker.recognize(file);
-    // Pick whichever found more R$ values (better parse)
-    const countR = (t) => (t.match(/R\s*\$\s*[\d.,]+/g) || []).length;
-    const text = countR(d1.text) >= countR(d2.text) ? d1.text : d2.text;
-    console.log('[OCR] preprocessed R$ count:', countR(d1.text), 'raw R$ count:', countR(d2.text));
-    return text;
+    const { data: d2 } = await worker.recognize(processed);
+    // Pass 3: forced inverted (for dark-mode screenshots)
+    const inverted = await preprocessImage(file, true);
+    const { data: d3 } = await worker.recognize(inverted);
+
+    const scores = [
+      { text: d1.text, score: countUseful(d1.text), label: 'raw' },
+      { text: d2.text, score: countUseful(d2.text), label: 'processed' },
+      { text: d3.text, score: countUseful(d3.text), label: 'inverted' }
+    ];
+    scores.sort((a, b) => b.score - a.score);
+    console.log('[OCR] scores:', scores.map(s => `${s.label}=${s.score}`).join(', '));
+    console.log('[OCR] best:', scores[0].label, '| text:', scores[0].text.substring(0, 300));
+    return scores[0].text;
   } finally {
     await worker.terminate();
   }
