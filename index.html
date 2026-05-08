@@ -3023,121 +3023,212 @@ function renderPlaquinhas() {
 function openManualValidation(email) {
   const aluno = STATE.summit.find(p => p.email === email);
   const nome = aluno ? aluno.nome : email;
-
-  // Check if already has manual extrato — pre-fill if so
   const plaq = STATE.plaquinhas[email];
   const existingManual = plaq?.extratos?.find(e => e.banco === 'Manual');
-  const prefill = existingManual ? Object.entries(existingManual.meses).sort(([a],[b]) => a.localeCompare(b)) : [];
+
+  // If already has manual data, go straight to edit view
+  const prefill = existingManual ? Object.entries(existingManual.meses).sort(([a],[b]) => a.localeCompare(b)) : null;
 
   const modal = document.createElement('div');
   modal.id = 'manual-val-modal';
   modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
   modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
 
-  const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-  const years = ['2024','2025','2026'];
-
-  function buildRow(prefillMonth, prefillValue) {
-    const [pY, pM] = prefillMonth ? prefillMonth.split('-') : ['',''];
-    const monthOpts = months.map((m, i) => {
-      const val = String(i+1).padStart(2,'0');
-      return `<option value="${val}" ${val===pM?'selected':''}>${m}</option>`;
-    }).join('');
-    const yearOpts = years.map(y => `<option value="${y}" ${y===pY?'selected':''}>${y}</option>`).join('');
-    const valStr = prefillValue ? prefillValue.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) : '';
-    return `<div class="manual-row" style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-      <select class="mv-month" style="padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px">
-        <option value="">Mês</option>${monthOpts}
-      </select>
-      <select class="mv-year" style="padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px">
-        ${yearOpts}
-      </select>
-      <input type="text" class="mv-value" placeholder="Valor (ex: 15000,00)" value="${valStr}" style="flex:1;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px">
-      <button onclick="this.closest('.manual-row').remove();updateManualTotal()" style="background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;padding:4px 8px">×</button>
-    </div>`;
-  }
-
-  const prefillRows = prefill.length > 0
-    ? prefill.map(([m, v]) => buildRow(m, v)).join('')
-    : buildRow('', null);
-
   modal.innerHTML = `
-    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;max-width:550px;width:100%;max-height:85vh;overflow-y:auto;padding:28px;position:relative">
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;max-width:600px;width:100%;max-height:85vh;overflow-y:auto;padding:28px;position:relative">
       <button onclick="document.getElementById('manual-val-modal').remove()" style="position:absolute;top:12px;right:16px;background:none;border:none;color:var(--text3);font-size:22px;cursor:pointer">✕</button>
 
       <h2 style="margin:0 0 4px;font-size:18px">✍️ Validação Manual</h2>
-      <p style="margin:0 0 20px;font-size:12px;color:var(--text3)">${nome} · ${email}</p>
+      <p style="margin:0 0 16px;font-size:12px;color:var(--text3)">${nome} · ${email}</p>
 
-      ${existingManual ? '<div style="background:rgba(234,179,8,0.1);border:1px solid rgba(234,179,8,0.3);border-radius:8px;padding:10px;margin-bottom:16px;font-size:12px;color:var(--yellow)">⚠ Já existe uma validação manual. Os valores abaixo substituirão a anterior.</div>' : ''}
+      ${existingManual ? '<div style="background:rgba(234,179,8,0.1);border:1px solid rgba(234,179,8,0.3);border-radius:8px;padding:10px;margin-bottom:16px;font-size:12px;color:var(--yellow)">⚠ Já existe uma validação manual. Os novos valores substituirão a anterior.</div>' : ''}
 
-      <div id="manual-rows">
-        ${prefillRows}
-      </div>
-
-      <button onclick="addManualRow()" style="padding:6px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;cursor:pointer;margin-bottom:20px">+ Adicionar Mês</button>
-
-      <div style="background:var(--bg);border-radius:8px;padding:14px;margin-bottom:20px">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <span style="font-size:13px;color:var(--text2)">Faturamento Total (manual):</span>
-          <span id="manual-total" style="font-size:18px;font-weight:700;color:var(--green)">R$ 0,00</span>
+      <!-- STEP 1: Paste area -->
+      <div id="manual-step1">
+        <p style="font-size:13px;color:var(--text2);margin:0 0 8px">Cole abaixo os dados de faturamento (mês e valor). Aceita formatos variados:</p>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:10px;line-height:1.6">
+          Exemplos: <code style="background:var(--bg);padding:2px 6px;border-radius:4px">Jan/2026: R$ 32.958,10</code> ou
+          <code style="background:var(--bg);padding:2px 6px;border-radius:4px">Dez/2025 31497,05</code> ou
+          <code style="background:var(--bg);padding:2px 6px;border-radius:4px">03/2026 - 43.862,62</code>
         </div>
-        <div id="manual-plaq-preview" style="margin-top:8px;font-size:12px;color:var(--text3)"></div>
+        <textarea id="manual-paste" placeholder="Cole aqui os dados mês a mês...&#10;&#10;Ex:&#10;Dez/2025: R$ 31.497,05&#10;Jan/2026: R$ 32.958,10&#10;Fev/2026: R$ 23.209,66&#10;Mar/2026: R$ 43.862,62" style="width:100%;height:180px;padding:12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;font-family:monospace;resize:vertical;outline:none"></textarea>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:12px">
+          <button onclick="document.getElementById('manual-val-modal').remove()" style="padding:8px 20px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;cursor:pointer">Cancelar</button>
+          <button onclick="processManualPaste('${email}')" style="padding:8px 20px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">🔍 Processar</button>
+        </div>
       </div>
 
-      <div style="display:flex;gap:10px;justify-content:flex-end">
-        <button onclick="document.getElementById('manual-val-modal').remove()" style="padding:8px 20px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;cursor:pointer">Cancelar</button>
-        <button onclick="confirmManualValidation('${email}')" style="padding:8px 20px;background:var(--green);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">✅ Salvar</button>
+      <!-- STEP 2: Editable table (hidden initially) -->
+      <div id="manual-step2" style="display:none">
+        <div id="manual-table-area"></div>
+
+        <div style="background:var(--bg);border-radius:8px;padding:14px;margin:16px 0">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:13px;color:var(--text2)">Faturamento Total:</span>
+            <span id="manual-total" style="font-size:20px;font-weight:700;color:var(--green)">R$ 0,00</span>
+          </div>
+          <div id="manual-plaq-preview" style="margin-top:8px;font-size:12px;color:var(--text3)"></div>
+        </div>
+
+        <div style="display:flex;gap:10px;justify-content:flex-end">
+          <button onclick="manualBackToStep1()" style="padding:8px 20px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;cursor:pointer">← Voltar</button>
+          <button onclick="confirmManualValidation('${email}')" style="padding:8px 20px;background:var(--green);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">✅ Salvar</button>
+        </div>
       </div>
     </div>
   `;
 
   document.body.appendChild(modal);
 
-  // Attach input listeners for live total
-  setTimeout(() => {
-    document.querySelectorAll('#manual-rows .mv-value').forEach(inp => {
-      inp.addEventListener('input', updateManualTotal);
-    });
-    updateManualTotal();
-  }, 50);
+  // If prefill exists, populate textarea and auto-process
+  if (prefill) {
+    const mn = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    const txt = prefill.map(([m, v]) => {
+      const [y, mm] = m.split('-');
+      return `${mn[parseInt(mm)]}/${y}: R$ ${v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+    }).join('\n');
+    document.getElementById('manual-paste').value = txt;
+    setTimeout(() => processManualPaste(email), 100);
+  }
 }
 
-function addManualRow() {
-  const container = document.getElementById('manual-rows');
-  const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-  const years = ['2024','2025','2026'];
-  const monthOpts = months.map((m, i) => `<option value="${String(i+1).padStart(2,'0')}">${m}</option>`).join('');
-  const yearOpts = years.map(y => `<option value="${y}">${y}</option>`).join('');
+function processManualPaste(email) {
+  const text = document.getElementById('manual-paste').value.trim();
+  if (!text) { toast('Cole os dados antes de processar'); return; }
 
-  const row = document.createElement('div');
-  row.className = 'manual-row';
-  row.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:8px';
-  row.innerHTML = `
-    <select class="mv-month" style="padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px">
-      <option value="">Mês</option>${monthOpts}
-    </select>
-    <select class="mv-year" style="padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px">
-      ${yearOpts}
-    </select>
-    <input type="text" class="mv-value" placeholder="Valor (ex: 15000,00)" style="flex:1;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px">
-    <button onclick="this.closest('.manual-row').remove();updateManualTotal()" style="background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;padding:4px 8px">×</button>
+  const monthMap = {
+    'jan':1,'fev':2,'mar':3,'abr':4,'mai':5,'jun':6,
+    'jul':7,'ago':8,'set':9,'out':10,'nov':11,'dez':12,
+    'janeiro':1,'fevereiro':2,'março':3,'marco':3,'abril':4,'maio':5,'junho':6,
+    'julho':7,'agosto':8,'setembro':9,'outubro':10,'novembro':11,'dezembro':12
+  };
+
+  const lines = text.split('\n').filter(l => l.trim());
+  const parsed = [];
+
+  for (const line of lines) {
+    // Extract value: R$ XX.XXX,XX or just XX.XXX,XX or XXXXX,XX
+    const valMatch = line.match(/R?\$?\s*([\d.]+,\d{2})/);
+    if (!valMatch) continue;
+    const val = parseFloat(valMatch[1].replace(/\./g,'').replace(',','.'));
+    if (!val || val <= 0) continue;
+
+    // Extract month/year — try multiple patterns
+    let month = null, year = null;
+
+    // Pattern 1: "Jan/2026", "Fev/2025", "Dez/2025"
+    const p1 = line.match(/([A-Za-zçã]+)\s*[\/\-]\s*(20\d{2})/i);
+    if (p1) {
+      const m = monthMap[p1[1].toLowerCase()];
+      if (m) { month = m; year = parseInt(p1[2]); }
+    }
+
+    // Pattern 2: "01/2026", "12/2025" (MM/YYYY)
+    if (!month) {
+      const p2 = line.match(/\b(0[1-9]|1[0-2])\s*[\/\-]\s*(20\d{2})\b/);
+      if (p2) { month = parseInt(p2[1]); year = parseInt(p2[2]); }
+    }
+
+    // Pattern 3: "2026-01", "2025-12" (YYYY-MM)
+    if (!month) {
+      const p3 = line.match(/(20\d{2})\s*[\/\-]\s*(0[1-9]|1[0-2])/);
+      if (p3) { year = parseInt(p3[1]); month = parseInt(p3[2]); }
+    }
+
+    if (month && year) {
+      parsed.push({ month, year, val, raw: line.trim() });
+    }
+  }
+
+  if (parsed.length === 0) {
+    toast('Não consegui identificar meses e valores. Verifique o formato.', 5000);
+    return;
+  }
+
+  // Build editable table
+  const mn = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  let tableHtml = `
+    <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:8px">
+      <thead><tr style="border-bottom:2px solid var(--border)">
+        <th style="padding:8px 10px;text-align:left;color:var(--text3);font-size:11px">Mês/Ano</th>
+        <th style="padding:8px 10px;text-align:right;color:var(--text3);font-size:11px">Valor (R$)</th>
+        <th style="padding:8px 10px;text-align:center;color:var(--text3);font-size:11px;width:40px"></th>
+      </tr></thead>
+      <tbody id="manual-edit-rows">
   `;
-  container.appendChild(row);
-  row.querySelector('.mv-value').addEventListener('input', updateManualTotal);
+
+  parsed.forEach((p, i) => {
+    const valStr = p.val.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+    tableHtml += `<tr class="manual-edit-row" data-month="${p.month}" data-year="${p.year}" style="border-bottom:1px solid var(--border)">
+      <td style="padding:8px 10px">
+        <select class="me-month" style="padding:4px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px">
+          ${[1,2,3,4,5,6,7,8,9,10,11,12].map(m => `<option value="${m}" ${m===p.month?'selected':''}>${mn[m]}</option>`).join('')}
+        </select>
+        <select class="me-year" style="padding:4px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px;margin-left:4px">
+          ${[2024,2025,2026].map(y => `<option value="${y}" ${y===p.year?'selected':''}>${y}</option>`).join('')}
+        </select>
+      </td>
+      <td style="padding:8px 10px;text-align:right">
+        <input type="text" class="me-value" value="${valStr}" style="width:140px;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:13px;text-align:right;font-variant-numeric:tabular-nums" oninput="recalcManualTable()">
+      </td>
+      <td style="text-align:center">
+        <button onclick="this.closest('tr').remove();recalcManualTable()" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer">×</button>
+      </td>
+    </tr>`;
+  });
+
+  tableHtml += `</tbody></table>
+    <button onclick="addManualEditRow()" style="padding:5px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:11px;cursor:pointer">+ Adicionar linha</button>`;
+
+  document.getElementById('manual-table-area').innerHTML = tableHtml;
+  document.getElementById('manual-step1').style.display = 'none';
+  document.getElementById('manual-step2').style.display = 'block';
+
+  recalcManualTable();
 }
 
-function updateManualTotal() {
-  const rows = document.querySelectorAll('#manual-rows .manual-row');
+function addManualEditRow() {
+  const mn = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const tbody = document.getElementById('manual-edit-rows');
+  const tr = document.createElement('tr');
+  tr.className = 'manual-edit-row';
+  tr.style.borderBottom = '1px solid var(--border)';
+  tr.innerHTML = `
+    <td style="padding:8px 10px">
+      <select class="me-month" style="padding:4px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px">
+        ${[1,2,3,4,5,6,7,8,9,10,11,12].map(m => `<option value="${m}">${mn[m]}</option>`).join('')}
+      </select>
+      <select class="me-year" style="padding:4px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px;margin-left:4px">
+        ${[2024,2025,2026].map(y => `<option value="${y}">${y}</option>`).join('')}
+      </select>
+    </td>
+    <td style="padding:8px 10px;text-align:right">
+      <input type="text" class="me-value" value="" placeholder="0,00" style="width:140px;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:13px;text-align:right;font-variant-numeric:tabular-nums" oninput="recalcManualTable()">
+    </td>
+    <td style="text-align:center">
+      <button onclick="this.closest('tr').remove();recalcManualTable()" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer">×</button>
+    </td>
+  `;
+  tbody.appendChild(tr);
+}
+
+function manualBackToStep1() {
+  document.getElementById('manual-step1').style.display = 'block';
+  document.getElementById('manual-step2').style.display = 'none';
+}
+
+function recalcManualTable() {
+  const rows = document.querySelectorAll('#manual-edit-rows .manual-edit-row');
   let total = 0;
   const meses = {};
 
   rows.forEach(row => {
-    const month = row.querySelector('.mv-month').value;
-    const year = row.querySelector('.mv-year').value;
-    const rawVal = row.querySelector('.mv-value').value.replace(/\s/g,'').replace(/R\$/g,'').replace(/\./g,'').replace(',','.');
+    const month = parseInt(row.querySelector('.me-month').value);
+    const year = parseInt(row.querySelector('.me-year').value);
+    const rawVal = row.querySelector('.me-value').value.replace(/\s/g,'').replace(/R\$/g,'').replace(/\./g,'').replace(',','.');
     const val = parseFloat(rawVal) || 0;
     if (month && year && val > 0) {
-      const key = `${year}-${month}`;
+      const key = `${year}-${String(month).padStart(2,'0')}`;
       meses[key] = (meses[key] || 0) + val;
       total += val;
     }
@@ -3146,12 +3237,10 @@ function updateManualTotal() {
   const fmt = v => `R$ ${v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
   document.getElementById('manual-total').textContent = fmt(total);
 
-  // Preview plaquinhas
   let preview = '';
   if (total > 0) {
     const ptier = classifyPlaquinhaTotal(total);
     preview += ptier ? `🏆 Fat. Total: ${ptier.label}` : '🏆 Fat. Total: —';
-
     const mensais = classifyPlaquinhasMensaisAcumulo(meses);
     if (mensais.length > 0) {
       preview += ` · 💰 Mensal: ${mensais.map(m => m.tier.label).join(', ')}`;
@@ -3161,26 +3250,25 @@ function updateManualTotal() {
 }
 
 async function confirmManualValidation(email) {
-  const rows = document.querySelectorAll('#manual-rows .manual-row');
+  const rows = document.querySelectorAll('#manual-edit-rows .manual-edit-row');
   const meses = {};
 
   rows.forEach(row => {
-    const month = row.querySelector('.mv-month').value;
-    const year = row.querySelector('.mv-year').value;
-    const rawVal = row.querySelector('.mv-value').value.replace(/\s/g,'').replace(/R\$/g,'').replace(/\./g,'').replace(',','.');
+    const month = parseInt(row.querySelector('.me-month').value);
+    const year = parseInt(row.querySelector('.me-year').value);
+    const rawVal = row.querySelector('.me-value').value.replace(/\s/g,'').replace(/R\$/g,'').replace(/\./g,'').replace(',','.');
     const val = parseFloat(rawVal) || 0;
     if (month && year && val > 0) {
-      const key = `${year}-${month}`;
+      const key = `${year}-${String(month).padStart(2,'0')}`;
       meses[key] = (meses[key] || 0) + val;
     }
   });
 
   if (Object.keys(meses).length === 0) {
-    toast('Adicione pelo menos um mês com valor válido');
+    toast('Nenhum mês com valor válido para salvar');
     return;
   }
 
-  // Initialize plaquinha entry if needed
   if (!STATE.plaquinhas[email]) {
     const aluno = STATE.summit.find(p => p.email === email);
     STATE.plaquinhas[email] = {
@@ -3191,10 +3279,8 @@ async function confirmManualValidation(email) {
   const plaq = STATE.plaquinhas[email];
   if (!plaq.extratos) plaq.extratos = [];
 
-  // Remove existing manual extrato if any (replace mode)
   plaq.extratos = plaq.extratos.filter(e => e.banco !== 'Manual');
 
-  // Add manual extrato
   const monthNames = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
   const sortedKeys = Object.keys(meses).sort();
   const periodoStr = sortedKeys.length > 0
