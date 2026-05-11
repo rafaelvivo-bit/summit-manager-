@@ -911,6 +911,7 @@ function processAlunos(text) {
 // ========== PLAQUINHAS CLASSIFICATION ==========
 // Faturamento Total thresholds (descending, with tolerance applied)
 const PLAQ_TOTAL_TIERS = [
+  { label: '6M',   min: 5100000, icon: '🏆' },
   { label: '5M',   min: 4250000, icon: '🌈' },
   { label: '4M',   min: 3400000, icon: '💥' },
   { label: '3M',   min: 2550000, icon: '🌟' },
@@ -2307,7 +2308,7 @@ function removeExtrato(email, extratoId) {
 }
 
 // Mapeamento tier label → valor nominal para fat. total garantido
-const TIER_NOMINAL = {'50K':50000,'100K':100000,'200K':200000,'350K':350000,'500K':500000,'750K':750000,'1M':1000000,'2M':2000000,'3M':3000000,'4M':4000000,'5M':5000000};
+const TIER_NOMINAL = {'50K':50000,'100K':100000,'200K':200000,'350K':350000,'500K':500000,'750K':750000,'1M':1000000,'2M':2000000,'3M':3000000,'4M':4000000,'5M':5000000,'6M':6000000};
 
 // Aliases: nomes conhecidos que são a mesma pessoa (nome curto → nome longo ou vice-versa)
 const PLAQ_NAME_ALIASES = {
@@ -3779,7 +3780,7 @@ const PLAQ_HISTORY = {"airton henrique machado do monte":{"100K":[2024],"10K/mê
 // Estoque atual de plaquinhas
 const PLAQ_ESTOQUE = {
   // Fat. Total (sem versionamento)
-  '50K':45,'100K':81,'200K':53,'350K':19,'500K':39,'750K':24,'1M':25,'2M':13,'3M':10,'4M':10,'5M':2,
+  '50K':45,'100K':81,'200K':53,'350K':19,'500K':39,'750K':24,'1M':25,'2M':13,'3M':10,'4M':10,'5M':2,'6M':3,
   // Mensal 1.0
   '10K/mês':90,'40K/mês':0,'100K/mês':40,'200K/mês':24,'300K/mês':12,'500K/mês':5,
   // Mensal 2.0
@@ -3903,7 +3904,7 @@ function renderLogistica() {
 
   // Build summary table: Placa | Estoque | Demanda 2026 | Delta
   const allTiers = [
-    '50K','100K','200K','350K','500K','750K','1M','2M','3M','4M','5M',
+    '50K','100K','200K','350K','500K','750K','1M','2M','3M','4M','5M','6M',
     '10K/mês','10K/mês 2.0','10K/mês 3.0',
     '40K/mês',
     '100K/mês','100K/mês 2.0','100K/mês 3.0',
