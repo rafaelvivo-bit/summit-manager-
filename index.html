@@ -202,6 +202,7 @@ tr.row-outro td { color:#34d399; }
     <div class="tab" data-tab="summit">Summit</div>
     <div class="tab" data-tab="mansao">Mansão</div>
     <div class="tab" data-tab="plaquinhas">Plaquinhas</div>
+    <div class="tab" data-tab="logistica">Logística Plaquinhas</div>
   </div>
 
   <div class="content">
@@ -213,6 +214,8 @@ tr.row-outro td { color:#34d399; }
     <div class="panel" id="panel-mansao"></div>
     <!-- PLAQUINHAS -->
     <div class="panel" id="panel-plaquinhas"></div>
+    <!-- LOGÍSTICA PLAQUINHAS -->
+    <div class="panel" id="panel-logistica"></div>
   </div>
 </div>
 
@@ -2503,6 +2506,7 @@ function renderAll() {
   renderSummitTable();
   renderMansaoTable();
   renderPlaquinhas();
+  renderLogistica();
 }
 
 function renderDashboard() {
@@ -3566,6 +3570,206 @@ function filterPlaq() {
     if (show) visible++;
   });
   document.getElementById('count-plaq').textContent = `${visible} alunos`;
+}
+
+// ========== LOGÍSTICA PLAQUINHAS ==========
+
+// Histórico de plaquinhas recebidas em anos anteriores (2024/2025)
+// nome_lower -> { tier -> [anos em que recebeu] }
+const PLAQ_HISTORY = {"airton henrique machado do monte":{"100K":[2024],"10K/mês":[2024]},"daniel pereira nunes":{"100K":[2024]},"fabiane novaes goeldi (germano)":{"100K":[2024]},"fauziane catherine beydoun":{"100K":[2024]},"fernanda rezende":{"100K":[2024],"750K":[2025],"40K/mês":[2025,2024]},"giely feltrin":{"100K":[2024]},"gustavo paiva":{"100K":[2024]},"iago mendonça":{"100K":[2024],"10K/mês":[2024]},"igor flor":{"100K":[2024],"10K/mês":[2024],"750K":[2025],"40K/mês":[2025]},"isa angélica moreira":{"100K":[2024]},"jéssica toro meneguello":{"100K":[2024],"10K/mês":[2024]},"jonatas rodrigues de santa rosa":{"100K":[2024],"10K/mês":[2024]},"júlia costa guimarães":{"100K":[2024],"10K/mês":[2024]},"kaio cesar e maria isabel":{"100K":[2024]},"bernardo maia":{"100K":[2024],"10K/mês":[2024],"1M":[2025]},"leonardo costa cardoso":{"100K":[2024],"10K/mês":[2024]},"lorena uliana":{"100K":[2024]},"lucas do nascimento fernandes":{"100K":[2024]},"lucas lira":{"100K":[2024]},"ludimila aparecida da rosa bortone":{"100K":[2024]},"matheus venturin":{"100K":[2024]},"murilo lisse":{"100K":[2024],"500K":[2025],"40K/mês":[2025,2024]},"renata kelly silva":{"100K":[2024]},"renato marques lorenzon":{"100K":[2024],"10K/mês":[2024]},"roberto gamma":{"100K":[2024]},"tiago rodrigo kutschenko padilha":{"100K":[2024]},"vitor de castro":{"100K":[2024],"10K/mês":[2024]},"vitória melo":{"100K":[2024],"10K/mês":[2024]},"wellington nogueira":{"100K":[2024],"10K/mês":[2024]},"jose rinaldo":{"10K/mês":[2024]},"raissa bernardinetti":{"10K/mês":[2024]},"matheus galvão":{"1M":[2024],"10K/mês":[2024],"2M":[2025],"40K/mês":[2025]},"ricardo melo":{"1M":[2024],"10K/mês":[2024]},"matheus candelot":{"200K":[2024],"10K/mês":[2024]},"gabriela cler":{"200K":[2024]},"pedro moura":{"200K":[2024],"10K/mês":[2024]},"arthur de souza":{"200K":[2024],"10K/mês":[2024]},"vanderson lopes":{"200K":[2024],"10K/mês":[2024]},"gabriel queiroz dos santos":{"200K":[2024],"10K/mês":[2024]},"gustavo pereira":{"200K":[2024],"10K/mês":[2024],"1M":[2025],"100K/mês":[2025],"40K/mês":[2025,2024]},"italo yan e laiane paula":{"200K":[2024],"10K/mês":[2024]},"marianny vasconselos":{"200K":[2024]},"muller gusmão marçal":{"200K":[2024],"10K/mês":[2024]},"isis orona e nathan cândido":{"200K":[2024],"10K/mês":[2024]},"arythan albuquerque":{"200K":[2024]},"renan severo almeida":{"200K":[2024],"10K/mês":[2024]},"antonio pedro tavares":{"200K":[2024],"10K/mês":[2024],"1M":[2025],"40K/mês":[2025]},"bruno brown":{"200K":[2024],"10K/mês":[2024]},"rithelle paixão":{"200K":[2024],"10K/mês":[2024]},"renan braz e hiohana paredes loch":{"200K":[2024],"10K/mês":[2024]},"antônio bernardino":{"200K":[2024],"10K/mês":[2024]},"rafael victor":{"200K":[2024],"10K/mês":[2024]},"rodrigo oliveira":{"500K":[2024],"10K/mês":[2024]},"leonardo silveira":{"500K":[2024],"10K/mês":[2024],"1M":[2025],"40K/mês":[2025],"100K/mês":[2025]},"matheus ezequiel":{"500K":[2024],"10K/mês":[2024]},"natália aresi ceolin":{"500K":[2024],"10K/mês":[2024]},"adriana luz martins sagno":{"50K":[2024]},"amanda hypólito":{"50K":[2024]},"fabio athanasio":{"50K":[2024]},"daniel teixeira ferreira":{"50K":[2024]},"marcelo vendiciano":{"50K":[2024]},"bruno crosara itagiba":{"50K":[2024]},"joão soares":{"50K":[2024]},"juliano cerqueira":{"50K":[2024]},"lana luca":{"50K":[2024]},"melina ciriaco":{"50K":[2024]},"vanessa de paula":{"50K":[2024]},"anna paula dos santos almeida":{"50K":[2024]},"laila bomtempo soares":{"50K":[2024]},"ademir ferreira junior":{"50K":[2024]},"késsia hadassa":{"50K":[2024]},"rafael dos santos figueredo barroso":{"50K":[2024]},"lorene simioni yassin":{"50K":[2024]},"bruno cavicchio":{"50K":[2024]},"caique fagundes rauber":{"50K":[2024]},"lucas de mores bender":{"50K":[2024]},"marcella farias":{"50K":[2024]},"lara barreto rosalino pereira":{"50K":[2024]},"aline blanc":{"50K":[2024]},"yan passos":{"50K":[2024]},"andré marques fernandes silva":{"50K":[2024]},"patrick lima":{"50K":[2024]},"diego bastos de morais":{"50K":[2024]},"ademir ferreira":{"500K":[2025],"40K/mês":[2025]},"alexandre botelho teixeira de lima":{"750K":[2025],"40K/mês":[2025,2024]},"alexandre faitarouni":{"350K":[2025],"40K/mês":[2025]},"alinah prol":{"100K":[2025],"40K/mês":[2025]},"aline andretta levis":{"100K":[2025]},"aline habibe de souza":{"200K":[2025]},"allana sulzback":{"100K":[2025],"40K/mês":[2025]},"amanda de sá bacelar":{"100K":[2025],"40K/mês":[2025]},"ana beatriz golvin schwan":{"200K":[2025],"40K/mês":[2025]},"ana carolina bail morais - $250 mil faturados e investidos btg+xp (6 meses mentoria). junho 2024 até janeiro 2025.":{"200K":[2025],"40K/mês":[2025]},"ana carolina nogueira garcia":{"200K":[2025]},"ana cristina guimarães de oliveira":{"500K":[2025],"40K/mês":[2025]},"ana paula bedin":{"50K":[2025],"40K/mês":[2025]},"ana paula fachini semmer":{"100K":[2025],"40K/mês":[2025]},"ana paula goulart":{"100K":[2025],"40K/mês":[2025]},"ana trindade":{"5M":[2025],"500K/mês":[2025],"300K/mês":[2025],"200K/mês":[2025],"100K/mês":[2025,2024],"40K/mês":[2025,2024]},"anderson matheus":{"100K":[2025],"40K/mês":[2025]},"andré coutinho de mello":{"50K":[2025]},"andré nascimento":{"50K":[2025]},"andré venturini":{"500K":[2025],"40K/mês":[2025,2024]},"andressa fröhlich troles":{"50K":[2025]},"anna beatriz silva gomes":{"100K":[2025]},"araceli arthuso":{"200K":[2025]},"ariel perazza":{"50K":[2025],"40K/mês":[2025]},"arthur catão martins dos santos":{"500K":[2025],"40K/mês":[2025,2024]},"arthur souza":{"750K":[2025],"40K/mês":[2025,2024]},"bruce nunes cordeiro bessa":{"100K":[2025]},"bruna fonseca":{"200K":[2025]},"bruno carmona":{"500K":[2025],"40K/mês":[2025]},"bruno dos santos macêdo":{"5M":[2025],"500K/mês":[2025],"300K/mês":[2025],"200K/mês":[2025],"40K/mês":[2025,2024],"100K/mês":[2025,2024]},"bruno itagiba":{"1M":[2025],"40K/mês":[2025,2024]},"bruno rua":{"1M":[2025],"40K/mês":[2025]},"caio cândido machado":{"750K":[2025],"40K/mês":[2025]},"caio cavalcanti cysneiros loureiro":{"100K":[2025],"40K/mês":[2025]},"caio fiocchi pita":{"50K":[2025]},"caio santana silvas das virgens":{"50K":[2025]},"camila faleiros veloso soares":{"100K":[2025]},"carlos curti":{"200K":[2025]},"carol marcon":{"100K":[2025],"40K/mês":[2025]},"caroliny ferreira":{"50K":[2025]},"cássia camila gomes da silva":{"350K":[2025],"40K/mês":[2025]},"cauane teixeira":{"100K":[2025]},"cíntia jahn":{"200K":[2025]},"crause celso":{"1M":[2025],"40K/mês":[2025,2024],"100K/mês":[2025,2024],"200K/mês":[2025]},"dagoberto mano ávila duarte júnior":{"1M":[2025],"100K/mês":[2025],"40K/mês":[2025,2024]},"daiana serpa soaje lessa":{"350K":[2025]},"daniel cavalcanti oliveira de sousa (done)":{"500K":[2025],"40K/mês":[2025]},"daniel normandia":{"500K":[2025],"40K/mês":[2025]},"daniel sobotca":{"100K":[2025]},"daniela gonçalves caetano":{"200K":[2025],"40K/mês":[2025]},"danilla caldas nunes":{"50K":[2025]},"danyella portela soares":{"100K":[2025]},"denis moraes rego de souza piers":{"100K":[2025]},"denise cruz santos gonçalves":{"100K":[2025]},"denner figueiredo":{"750K":[2025],"40K/mês":[2025]},"diogo zanello":{"350K":[2025],"40K/mês":[2025]},"djuna k vieira":{"500K":[2025],"40K/mês":[2025]},"eder lima":{"350K":[2025],"40K/mês":[2025]},"ederson vargas":{"350K":[2025]},"eduard carvalho":{"500K":[2025],"100K/mês":[2025],"40K/mês":[2025,2024]},"eduarda wolski barbosa":{"100K":[2025]},"emerson lima silva":{"500K":[2025],"100K/mês":[2025],"40K/mês":[2025,2024]},"erik prata":{"50K":[2025]},"fabiana rodrigues":{"500K":[2025],"40K/mês":[2025]},"fábio de sá segóbia sanches":{"100K":[2025]},"fabricio moura":{"750K":[2025],"40K/mês":[2025],"100K/mês":[2025],"200K/mês":[2025]},"fernanda fernandes de oliveira":{"1M":[2025],"40K/mês":[2025],"100K/mês":[2025]},"filipe fagundes martins":{"200K":[2025],"40K/mês":[2025]},"francieli grave marini kempf":{"50K":[2025]},"gabriel ferreira santos macedo":{"500K":[2025],"40K/mês":[2025,2024]},"gabriela corrêa pereira":{"50K":[2025]},"gabriela donatoni assis":{"50K":[2025]},"gabriela gavioli":{"100K":[2025]},"gabriela trigueiro":{"500K":[2025],"40K/mês":[2025]},"gabrielle lima castro":{"50K":[2025]},"glauber marinho":{"500K":[2025]},"guilherme coelho":{"750K":[2025],"40K/mês":[2025]},"gustavo fogaça":{"200K":[2025],"40K/mês":[2025]},"hannah brandão":{"100K":[2025]},"henrique monteiro bocatto":{"200K":[2025]},"iara mina rocha calazans":{"100K":[2025]},"isabel tatiana guimarães":{"200K":[2025]},"isabela sangi":{"100K":[2025],"40K/mês":[2025]},"isabella de godoy almeida":{"750K":[2025],"40K/mês":[2025]},"isabella dresch martins":{"50K":[2025]},"isabelle alves da silva":{"100K":[2025]},"isis orona":{"1M":[2025],"40K/mês":[2025,2024]},"izabela klein":{"750K":[2025],"40K/mês":[2025]},"jaksuel sebastian":{"100K":[2025]},"janine hampel":{"350K":[2025],"40K/mês":[2025]},"jaqueline carvalho lopes":{"100K":[2025]},"jéssica bretas":{"750K":[2025],"40K/mês":[2025,2024]},"jéssika millenny":{"100K":[2025]},"joão antônio pereira":{"100K":[2025],"40K/mês":[2025]},"joão henrique soares":{"500K":[2025],"40K/mês":[2025,2024]},"joão pedro da silva pereira":{"200K":[2025],"40K/mês":[2025]},"josé costa silva neto":{"100K":[2025]},"julia soares rios":{"100K":[2025]},"juliana carvalho e hernany sathler":{"2M":[2025],"300K/mês":[2025],"100K/mês":[2025],"200K/mês":[2025],"40K/mês":[2025]},"juliana carvalho e hernany sathler  ( novo comprovante total)":{"2M":[2025],"300K/mês":[2025],"100K/mês":[2025],"200K/mês":[2025],"40K/mês":[2025]},"juliana karen de souza":{"100K":[2025]},"kaian estevao freitas santos":{"100K":[2025]},"kaio stanizio":{"200K":[2025]},"karen passos":{"50K":[2025]},"karol dorneles silva":{"350K":[2025]},"karolina andresa da silva meincke":{"100K":[2025]},"kelly toresani andrade":{"200K":[2025]},"kestilen sabrina da silva nunes":{"200K":[2025]},"laísa sousa lima":{"200K":[2025]},"larissa de oliveira alves":{"100K":[2025],"40K/mês":[2025]},"laura milagres":{"1M":[2025],"40K/mês":[2025,2024]},"leander hansen - viking":{"750K":[2025],"40K/mês":[2025]},"leonardo dos santos beguine":{"350K":[2025],"40K/mês":[2025]},"leonardo machado castro junior":{"500K":[2025],"40K/mês":[2025]},"leticya pedra de araújo":{"50K":[2025]},"lorena dutra":{"2M":[2025],"300K/mês":[2025],"200K/mês":[2025],"100K/mês":[2025],"40K/mês":[2025,2024]},"lorena souza":{"100K":[2025]},"luana falcão":{"500K":[2025],"40K/mês":[2025,2024]},"luana pricilla de oliveira":{"200K":[2025]},"lucas de sousa santos":{"200K":[2025],"40K/mês":[2025]},"lucas mendonça silva":{"500K":[2025],"40K/mês":[2025,2024]},"lucas otero":{"200K":[2025],"40K/mês":[2025]},"lucas ximenes":{"50K":[2025]},"luciana bittencourt peixoto":{"100K":[2025]},"luís gustavo de souza mota":{"500K":[2025],"40K/mês":[2025,2024]},"luiz correia":{"1M":[2025],"40K/mês":[2025,2024]},"luiza fernandes oliveira batista":{"100K":[2025],"40K/mês":[2025]},"malek toum":{"100K":[2025]},"manuela campos ferreira":{"200K":[2025]},"manuela lauand ascenção":{"200K":[2025]},"manuelle carvalho moreira":{"100K":[2025]},"marcela rodrigues gonçalves":{"350K":[2025]},"marcilene barbosa de oliveira pereira":{"50K":[2025]},"maria clara peixoto lopes":{"200K":[2025],"40K/mês":[2025]},"maria eduarda da silva":{"100K":[2025]},"maria luiza cerqueira":{"100K":[2025]},"mariana ferreira de souza":{"50K":[2025]},"mariana pires frank":{"100K":[2025],"40K/mês":[2025]},"mariel tainá de souza":{"50K":[2025]},"marjorie victoria godoi pedreti":{"100K":[2025]},"matheus de souza alves":{"200K":[2025]},"matheus gustavo da silva rezende":{"750K":[2025],"40K/mês":[2025,2024]},"matheus santana rezende":{"100K":[2025]},"mikaelle santos oliveira":{"200K":[2025]},"milena rocha de moraes alves":{"350K":[2025],"40K/mês":[2025]},"milenna larissa conceição":{"100K":[2025],"40K/mês":[2025]},"monique corsini leitão fender":{"500K":[2025],"40K/mês":[2025]},"monique santana":{"100K":[2025]},"mylena morais alencar":{"100K":[2025]},"natália ceolin":{"1M":[2025],"40K/mês":[2025],"100K/mês":[2025]},"nerissa de oliveira":{"100K":[2025]},"octavio teixeira barreira":{"200K":[2025]},"pamela pereira":{"50K":[2025]},"paulo roberto gomes":{"350K":[2025],"40K/mês":[2025]},"pedro henrique coelho battisti":{"50K":[2025]},"pedro henrique rodrigues":{"100K":[2025]},"pedro reis":{"500K":[2025],"40K/mês":[2025,2024],"100K/mês":[2025]},"philippe maciel":{"200K":[2025],"40K/mês":[2025]},"polliana reis pedrosa":{"500K":[2025],"40K/mês":[2025]},"rafael da silva jerônimo":{"200K":[2025]},"rafael duarte":{"40K/mês":[2025]},"rafael kenji":{"750K":[2025],"40K/mês":[2025,2024]},"rafael martins gonçalves":{"100K":[2025]},"ramzia ali":{"50K":[2025]},"rayanne rocha batista custodio":{"200K":[2025],"40K/mês":[2025]},"renato lorenzon":{"1M":[2025],"40K/mês":[2025]},"rithelle paixao":{"1M":[2025],"40K/mês":[2025,2024]},"roberto da silva cabral albuquerque":{"100K":[2025],"40K/mês":[2025]},"ronaldo rodrigues de souza filho":{"100K":[2025]},"rosangela souza de castilho":{"50K":[2025]},"rufina rosa figueiredo ferreira":{"100K":[2025]},"samantha lara":{"200K":[2025]},"sonia schmidt":{"100K":[2025]},"tais rodrigues baraldi":{"50K":[2025]},"thainan bernardi mendes":{"50K":[2025]},"thais burgos e carol sapucaia":{"500K":[2025]},"thais vieira":{"100K":[2025],"40K/mês":[2025]},"thayna cristina de souza oliveira":{"200K":[2025],"100K":[2025]},"thays peres":{"200K":[2025]},"tito melcorp":{"2M":[2025],"300K/mês":[2025],"200K/mês":[2025],"100K/mês":[2025],"40K/mês":[2025,2024]},"tulio nishiyama teodoro":{"50K":[2025]},"uyara lima":{"100K":[2025]},"vallérya aguiar":{"1M":[2025],"40K/mês":[2025],"100K/mês":[2025]},"victor marcelo viana":{"100K":[2025]},"vinicius bueno roma":{"50K":[2025]},"vinicius de oliveira cardoso":{"350K":[2025],"40K/mês":[2025]},"vitor castro":{"750K":[2025],"40K/mês":[2025]},"viviane de araújo benevides":{"200K":[2025],"40K/mês":[2025]},"wesley maciel galdino de oliveira":{"50K":[2025]},"willian moitinho":{"100K":[2025]},"yara chris teixeira albuquerque":{"100K":[2025]},"yasmin emanuelle fernandes":{"100K":[2025]},"yuri fred":{"350K":[2025],"40K/mês":[2025],"100K/mês":[2025]}};
+
+// Estoque atual de plaquinhas
+const PLAQ_ESTOQUE = {
+  // Fat. Total (sem versionamento)
+  '50K':45,'100K':81,'200K':53,'350K':19,'500K':39,'750K':24,'1M':25,'2M':13,'3M':10,'4M':10,'5M':2,
+  // Mensal 1.0
+  '10K/mês':90,'40K/mês':0,'100K/mês':40,'200K/mês':24,'300K/mês':12,'500K/mês':5,
+  // Mensal 2.0
+  '10K/mês 2.0':70,'100K/mês 2.0':15,'200K/mês 2.0':10,'300K/mês 2.0':10,'500K/mês 2.0':3,
+  // Mensal 3.0
+  '10K/mês 3.0':30,'100K/mês 3.0':15
+};
+
+// Quais tiers mensal possuem versão 2.0 e 3.0
+const MENSAL_HAS_20 = new Set(['10K/mês','100K/mês','200K/mês','300K/mês','500K/mês']);
+const MENSAL_HAS_30 = new Set(['10K/mês','100K/mês']);
+
+function getPlaqVersion(tierDisplay, nomeAluno) {
+  const key = (nomeAluno||'').toLowerCase().trim();
+  const hist = PLAQ_HISTORY[key];
+  if (!hist || !hist[tierDisplay]) return '1.0';
+  const priorYears = hist[tierDisplay].length;
+  if (priorYears >= 2 && MENSAL_HAS_30.has(tierDisplay)) return '3.0';
+  if (priorYears >= 1 && MENSAL_HAS_20.has(tierDisplay)) return '2.0';
+  return '1.0';
+}
+
+function renderLogistica() {
+  const alunos = STATE.summit.filter(p => p.segmento === 'Aluno');
+  const fmt = v => `R$ ${v.toLocaleString('pt-BR',{minimumFractionDigits:0})}`;
+
+  // Build demand: for each aluno with plaquinhas, determine version needed
+  const demand = {}; // "tierDisplay" or "tierDisplay 2.0" -> { count, alunos:[] }
+  const alunoPlaqDetails = []; // for the alunos table
+
+  alunos.forEach(a => {
+    const p = STATE.plaquinhas[a.email];
+    if (!p || !p.extratos?.length) return;
+
+    const nome = p.nome || a.nome;
+    const details = { nome, email: a.email, placas: [] };
+
+    // Fat. Total — sem versionamento
+    if (p.plaq_total && p.plaq_total !== '—') {
+      const tier = p.plaq_total;
+      if (!demand[tier]) demand[tier] = { count:0, alunos:[] };
+      demand[tier].count++;
+      demand[tier].alunos.push(nome);
+      details.placas.push({ tier, version: '1.0', type: 'total' });
+    }
+
+    // Mensal — com versionamento baseado no histórico
+    if (p.plaq_mensais && p.plaq_mensais.length > 0) {
+      p.plaq_mensais.forEach(m => {
+        const tierLabel = m.tier.label; // e.g. "40K/mês"
+        const version = getPlaqVersion(tierLabel, nome);
+        const displayKey = version === '1.0' ? tierLabel : `${tierLabel} ${version}`;
+
+        if (!demand[displayKey]) demand[displayKey] = { count:0, alunos:[] };
+        demand[displayKey].count++;
+        demand[displayKey].alunos.push(nome);
+        details.placas.push({ tier: tierLabel, version, type: 'mensal' });
+      });
+    }
+
+    if (details.placas.length > 0) alunoPlaqDetails.push(details);
+  });
+
+  // Build summary table: Placa | Estoque | Demanda 2026 | Delta
+  const allTiers = [
+    '50K','100K','200K','350K','500K','750K','1M','2M','3M','4M','5M',
+    '10K/mês','10K/mês 2.0','10K/mês 3.0',
+    '40K/mês',
+    '100K/mês','100K/mês 2.0','100K/mês 3.0',
+    '200K/mês','200K/mês 2.0',
+    '300K/mês','300K/mês 2.0',
+    '500K/mês','500K/mês 2.0'
+  ];
+
+  let totalEstoque = 0, totalDemanda = 0, totalPedir = 0;
+
+  let summaryRows = '';
+  allTiers.forEach(tier => {
+    const est = PLAQ_ESTOQUE[tier] || 0;
+    const dem = demand[tier] ? demand[tier].count : 0;
+    const delta = dem - est;
+    totalEstoque += est;
+    totalDemanda += dem;
+    if (delta > 0) totalPedir += delta;
+
+    const isTotal = !tier.includes('/mês');
+    const is20 = tier.includes('2.0');
+    const is30 = tier.includes('3.0');
+    const bgColor = delta > 0 ? 'rgba(239,68,68,0.1)' : (dem > 0 ? 'rgba(34,197,94,0.08)' : '');
+    const deltaColor = delta > 0 ? 'var(--red)' : (delta < 0 ? 'var(--green)' : 'var(--text3)');
+    const deltaText = delta > 0 ? `+${delta} ⚠` : (delta < 0 ? `${delta} ✓` : '0');
+    const versionBadge = is30 ? '<span style="background:rgba(168,85,247,0.2);color:var(--purple);padding:2px 6px;border-radius:4px;font-size:10px;margin-left:4px">3.0</span>' :
+                          is20 ? '<span style="background:rgba(245,158,11,0.2);color:var(--yellow);padding:2px 6px;border-radius:4px;font-size:10px;margin-left:4px">2.0</span>' : '';
+    const typeBadge = isTotal ? '<span style="color:var(--accent2);font-size:10px">Total</span>' : '<span style="color:var(--yellow);font-size:10px">Mensal</span>';
+
+    summaryRows += `<tr style="background:${bgColor};border-bottom:1px solid var(--border)">
+      <td style="padding:8px 12px">${tier.replace(' 2.0','').replace(' 3.0','')} ${versionBadge}</td>
+      <td style="padding:8px 12px;text-align:center">${typeBadge}</td>
+      <td style="padding:8px 12px;text-align:right;font-variant-numeric:tabular-nums">${est}</td>
+      <td style="padding:8px 12px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600">${dem}</td>
+      <td style="padding:8px 12px;text-align:right;font-weight:700;color:${deltaColor}">${deltaText}</td>
+    </tr>`;
+  });
+
+  // Build alunos table (who gets 2.0/3.0)
+  const alunos20_30 = alunoPlaqDetails.filter(a => a.placas.some(p => p.version !== '1.0'));
+  let alunosRows = '';
+  alunos20_30.sort((a,b) => a.nome.localeCompare(b.nome,'pt')).forEach(a => {
+    const badges = a.placas.filter(p => p.version !== '1.0').map(p => {
+      const color = p.version === '3.0' ? 'var(--purple)' : 'var(--yellow)';
+      const bg = p.version === '3.0' ? 'rgba(168,85,247,0.15)' : 'rgba(245,158,11,0.15)';
+      return `<span style="background:${bg};color:${color};padding:2px 8px;border-radius:4px;font-size:11px;margin:1px">${p.tier} ${p.version}</span>`;
+    }).join(' ');
+    alunosRows += `<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:6px 12px;font-size:13px">${a.nome}</td>
+      <td style="padding:6px 12px;font-size:11px;color:var(--text3)">${a.email}</td>
+      <td style="padding:6px 12px">${badges}</td>
+    </tr>`;
+  });
+
+  const pedirCount = allTiers.filter(t => (demand[t]?.count || 0) - (PLAQ_ESTOQUE[t] || 0) > 0).length;
+
+  let html = `
+    <div class="dash-grid" style="margin-bottom:20px">
+      <div class="dash-card purple">
+        <div class="number">${totalDemanda}</div>
+        <div class="label">Plaquinhas Necessárias</div>
+        <div class="sub">Demanda 2026</div>
+      </div>
+      <div class="dash-card green">
+        <div class="number">${totalEstoque}</div>
+        <div class="label">Em Estoque</div>
+        <div class="sub">Todas versões</div>
+      </div>
+      <div class="dash-card red">
+        <div class="number">${totalPedir}</div>
+        <div class="label">Pedir (Delta)</div>
+        <div class="sub">${pedirCount} tipo(s) com estoque insuficiente</div>
+      </div>
+      <div class="dash-card yellow">
+        <div class="number">${alunos20_30.length}</div>
+        <div class="label">Alunos 2.0 / 3.0</div>
+        <div class="sub">Plaquinhas com versão especial</div>
+      </div>
+    </div>
+
+    <div class="dash-row2" style="margin-bottom:20px">
+      <div class="dash-section">
+        <h3>📦 Estoque vs Demanda</h3>
+        <div style="max-height:500px;overflow-y:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead><tr style="border-bottom:2px solid var(--border)">
+              <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--text3)">Plaquinha</th>
+              <th style="padding:8px 12px;text-align:center;font-size:11px;color:var(--text3)">Tipo</th>
+              <th style="padding:8px 12px;text-align:right;font-size:11px;color:var(--text3)">Estoque</th>
+              <th style="padding:8px 12px;text-align:right;font-size:11px;color:var(--text3)">Demanda</th>
+              <th style="padding:8px 12px;text-align:right;font-size:11px;color:var(--text3)">Delta (pedir)</th>
+            </tr></thead>
+            <tbody>${summaryRows}
+              <tr style="border-top:2px solid var(--border);font-weight:700">
+                <td style="padding:8px 12px" colspan="2">TOTAL</td>
+                <td style="padding:8px 12px;text-align:right">${totalEstoque}</td>
+                <td style="padding:8px 12px;text-align:right">${totalDemanda}</td>
+                <td style="padding:8px 12px;text-align:right;color:${totalPedir>0?'var(--red)':'var(--green)'}">${totalPedir > 0 ? `+${totalPedir} ⚠` : '0 ✓'}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="dash-section">
+        <h3>🌟 Alunos com Plaquinha 2.0 / 3.0 (${alunos20_30.length})</h3>
+        <div style="max-height:500px;overflow-y:auto">
+          ${alunos20_30.length > 0 ? `
+          <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead><tr style="border-bottom:2px solid var(--border)">
+              <th style="padding:6px 12px;text-align:left;font-size:11px;color:var(--text3)">Nome</th>
+              <th style="padding:6px 12px;text-align:left;font-size:11px;color:var(--text3)">E-mail</th>
+              <th style="padding:6px 12px;text-align:left;font-size:11px;color:var(--text3)">Versão</th>
+            </tr></thead>
+            <tbody>${alunosRows}</tbody>
+          </table>` : '<p style="color:var(--text3);text-align:center;padding:20px">Nenhum aluno com plaquinha 2.0/3.0 até o momento</p>'}
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('panel-logistica').innerHTML = html;
 }
 
 // ========== EXPORT ==========
