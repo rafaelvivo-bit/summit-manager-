@@ -203,6 +203,7 @@ tr.row-outro td { color:#34d399; }
     <div class="tab" data-tab="mansao">Mansão</div>
     <div class="tab" data-tab="plaquinhas">Plaquinhas</div>
     <div class="tab" data-tab="logistica">Logística Plaquinhas</div>
+    <div class="tab" data-tab="metas">Metas</div>
   </div>
 
   <div class="content">
@@ -216,6 +217,7 @@ tr.row-outro td { color:#34d399; }
     <div class="panel" id="panel-plaquinhas"></div>
     <!-- LOGÍSTICA PLAQUINHAS -->
     <div class="panel" id="panel-logistica"></div>
+    <div class="panel" id="panel-metas"></div>
   </div>
 </div>
 
@@ -2598,6 +2600,7 @@ function renderAll() {
   renderMansaoTable();
   renderPlaquinhas();
   renderLogistica();
+  renderMetas();
 }
 
 function renderDashboard() {
@@ -3852,6 +3855,147 @@ function getPlaqVersion(tierDisplay, nomeAluno) {
   if (years.length >= 2 && MENSAL_HAS_30.has(tierDisplay)) return '3.0';
   if (years.length >= 1 && MENSAL_HAS_20.has(tierDisplay)) return '2.0';
   return '1.0';
+}
+
+// ========== METAS (Plaquinhas Desejadas) ==========
+const PLAQ_METAS = {"nutrimilenag@gmail.com":{"nome":"Milena Gomes","programa":"Orion","desejada":"100K"},"carolnarimatsu@gmail.com":{"nome":"Caroline dos Santos Narimatsu","programa":"Atlas","desejada":"200K"},"maycon_dns@hotmail.com":{"nome":"Maycon Douglas Neves de Sousa","programa":"Chronos Journey","desejada":"350K"},"nutrianasemmer@gmail.com":{"nome":"Ana Paula Semmer","programa":"Chronos","desejada":"500K"},"brunapedroso.nutri@gmail.com":{"nome":"Bruna Lima Pedroso","programa":"Orion","desejada":"50K"},"laisgalvao2@hotmail.com":{"nome":"Lais Galvão","programa":"Atlas","desejada":"200K"},"jlopecj@yahoo.com.br":{"nome":"Jaqueline Carvalho Lopes","programa":"Chronos Journey","desejada":"350K"},"dani.normandia1@hotmail.com":{"nome":"Daniel Normandia","programa":"Chronos","desejada":"1M"},"on.lucasmendonca@gmail.com":{"nome":"Lucas Mendonça Silva","programa":"Chronos Journey","desejada":"1M"},"joao_efi@yahoo.com.br":{"nome":"João Antônio Pereira","programa":"Chronos Journey","desejada":"1M"},"kestilen_sabrina@yahoo.com":{"nome":"Kestilen Sabrina da Silva Nunes","programa":"Atlas","desejada":"500K"},"nutri.vivianeml@gmail.com":{"nome":"Viviane Marcondes Laranja","programa":"Orion","desejada":"50K"},"suporteluanafalcao@gmail.com":{"nome":"Luana Karina Falcão de Paiva","programa":"Chronos","desejada":"750K"},"nutricionistafernandaregert@gmail.com":{"nome":"Fernanda Regert Melo","programa":"Orion","desejada":"50K"},"guijaldin@gmail.com":{"nome":"Guilherme Demattio Jaldin","programa":"Orion","desejada":"100K"},"anacarolinablaureano@gmail.com":{"nome":"Ana Carolina Laureano","programa":"Atlas","desejada":"100K"},"arthur.anadon0612@gmail.com":{"nome":"Arthur Anadon","programa":"Orion","desejada":"100K"},"viniciuscaardoso@hotmail.com":{"nome":"Vinícius de Oliveira Cardoso","programa":"Chronos Journey","desejada":"750K"},"eflima.nutri@gmail.com":{"nome":"Eduarda Fernandes de Lima","programa":"Orion","desejada":"50K"},"clarissademezio@gmail.com":{"nome":"Clarissa Viana Demézio da Silva","programa":"Atlas","desejada":"50K"},"ascruz0601@gmail.com":{"nome":"Annabella Schiappacasse Cruz","programa":"Orion","desejada":"50K"},"nutrinataliaceolin@gmail.com":{"nome":"Natália Aresi Ceolin","programa":"Chronos Journey","desejada":"2M"},"gabibazia@hotmail.com":{"nome":"Gabriela Raisa Bazia","programa":"Orion","desejada":"100K"},"marinacamargonutricionista@gmail.com":{"nome":"Marina Camargo","programa":"Orion","desejada":"50K"},"karolinedorneless@gmail.com":{"nome":"Karoline Dorneles Silva","programa":"Atlas","desejada":"750K"},"ursulamaas.o@gmail.com":{"nome":"Ursula Maas","programa":"Chronos Journey","desejada":"100K"},"luis.henrique.assis@outlook.com":{"nome":"Luís Henrique de Assis Cunha","programa":"Orion","desejada":"50K"},"moniquesantana.nutri@gmail.com":{"nome":"Monique Santana Costa","programa":"Atlas","desejada":"350K"},"nutrieltonfernandes@gmail.com":{"nome":"Elton Fernandes de Macedo","programa":"Atlas","desejada":"200K"},"nutricionistaingridk@gmail.com":{"nome":"Ingrid Krichinak","programa":"Atlas","desejada":"200K"},"gabimaia87@gmail.com":{"nome":"Gabriela Furtado de Vasconcelos Maia","programa":"Orion","desejada":"50K"},"perazzaariel@gmail.com":{"nome":"Ariel Perazza","programa":"Chronos Journey","desejada":"500K"},"matheus.santanarezende@gmail.com":{"nome":"Matheus Santana Rezende","programa":"Orion","desejada":"350K"},"carolnogueiranutri@gmail.com":{"nome":"Ana Carolina Nogueira Garcia","programa":"Atlas","desejada":"500K"},"gf.nutrir@gmail.com":{"nome":"Gabriel Figueiredo Ferreira","programa":"Chronos Journey","desejada":"350K"},"fabriciomouratreinador@gmail.com":{"nome":"Fabricio Hermes Vieira de Moura","programa":"Chronos Journey","desejada":"3M"},"nutricao.gp@gmail.com":{"nome":"Gustavo Pereira","programa":"Chronos","desejada":"2M"},"thaiscordeiro2005@hotmail.com":{"nome":"Thais Cordeiro","programa":"Atlas","desejada":"50K"},"isabelasangi18@hotmail.com":{"nome":"Isabela da Silva Sangi","programa":"Chronos","desejada":"350K"},"caldasthiago@gmail.com":{"nome":"Maria Julia Fernandes - TFIT","programa":"Orion","desejada":"350K"},"helio.barros@gmail.com":{"nome":"Helio Cardoso de Barros","programa":"Chronos Journey","desejada":"50K"},"caioandradenutri19@gmail.com":{"nome":"Caio Luiz Santos Andrade | Nutricionista","programa":"Orion","desejada":"50K"},"brunoitagiba16@gmail.com":{"nome":"Bruno Crosara Itagiba","programa":"Chronos Journey","desejada":"2M"},"brunnoarauj@hotmail.com":{"nome":"Ayrton Brunno Morais de Araujo","programa":"Orion","desejada":"100K"},"gabrielmellonutri@gmail.com":{"nome":"Gabriel Mello do Nascimento","programa":"Atlas","desejada":"200K"},"drajacklima@gmail.com":{"nome":"Jackeline Graça Lima Reis da Silva","programa":"Atlas","desejada":"100K"},"tsarian@uol.com.br":{"nome":"Thais Mantovani Sarian Palumbo","programa":"Atlas","desejada":"200K"},"beatricevillasboas@gmail.com":{"nome":"Beatrice Azeredo Villas Boas","programa":"Atlas","desejada":"100K"},"leo_siilveira@hotmail.com":{"nome":"Leonardo Da Silveira","programa":"Chronos Journey","desejada":"2M"},"thierrycrei@gmail.com":{"nome":"Thierry Lemos","programa":"Atlas","desejada":"200K"},"m.r.goncalves@hotmail.com":{"nome":"Marcela Rodrigues Gonçalves","programa":"Atlas","desejada":"750K"},"ederlimacampos@hotmail.com":{"nome":"Eder Lima Campos","programa":"Chronos Journey","desejada":"1M"},"thiagokenjiogata@gmail.com":{"nome":"Thiago Kenji Ogata","programa":"Orion","desejada":"100K"},"ntathiagocruz@hotmail.com":{"nome":"Thiago Pereira Cruz","programa":"Orion","desejada":"50K"},"leticialoureironutri@gmail.com":{"nome":"Letícia Veloso Loureiro","programa":"Atlas","desejada":"200K"},"cintia.jahnn@gmail.com":{"nome":"Cíntia da Silva Jahn","programa":"Atlas","desejada":"500K"},"yuriifred@gmail.com":{"nome":"Yuri Fred","programa":"Atlas","desejada":"1M"},"nutri.nathgomes@gmail.com":{"nome":"Nathalia Stefani Gomes","programa":"Orion","desejada":"100K"},"contato@laizsaragiotto.com.br":{"nome":"Laiz Saragiotto","programa":"Atlas","desejada":"200K"},"jaquelinebarros87@gmail.com":{"nome":"Jaqueline de Barros","programa":"Orion","desejada":"100K"},"samantha_lara@hotmail.com":{"nome":"Samantha Lara","programa":"Atlas","desejada":"350K"},"vivianechamon@yahoo.com.br":{"nome":"Viviane Mayla Tadeu dos Reis Chamon Cardoso","programa":"Orion","desejada":"50K"},"isabelladreschm@gmail.com":{"nome":"Isabella Dresch Martins","programa":"Orion","desejada":"100K"},"pedromaia960@gmail.com":{"nome":"Pedro Maia","programa":"Atlas","desejada":"200K"},"annealvesnutri@gmail.com":{"nome":"Anne Alves | Saúde da Mulher","programa":"Atlas","desejada":"100K"},"yurisabinoviana1@gmail.com":{"nome":"Yuri Sabino Viana","programa":"Atlas","desejada":"100K"},"gabiassisnutri@gmail.com":{"nome":"Gabriela Donatoni Assis","programa":"Atlas","desejada":"200K"},"leticiabagatini07@gmail.com":{"nome":"Leticia Bagatini | Nutricionista Esportiva","programa":"Atlas","desejada":"200K"},"liviamnutri@gmail.com":{"nome":"Livia Marques","programa":"Atlas","desejada":"50K"},"jullialadeira15@hotmail.com":{"nome":"Julia Ladeira","programa":"Atlas","desejada":"50K"},"nutri.jessikacordeiro@gmail.com":{"nome":"Jessika Rayssa Vicente Cordeiro Araujo","programa":"Orion","desejada":"200K"},"denisecsgoncalves@gmail.com":{"nome":"Denise da Cruz Santos Gonçalves","programa":"Atlas","desejada":"200K"},"pierinutri@gmail.com":{"nome":"Bruno Luiz da Silva Pieri","programa":"Chronos","desejada":"50K"},"sofiabedinotemadalozzo@gmail.com":{"nome":"Sofia Bedinote Madalozzo","programa":"Atlas","desejada":"200K"}};
+
+function renderMetas() {
+  const fmt = v => `R$ ${v.toLocaleString('pt-BR',{minimumFractionDigits:0})}`;
+  const TIER_VAL = TIER_NOMINAL;
+  const TIER_ORDER = {'50K':1,'100K':2,'200K':3,'350K':4,'500K':5,'750K':6,'1M':7,'2M':8,'3M':9,'4M':10,'5M':11,'6M':12};
+
+  const rows = [];
+  let atingiu = 0, superou = 0, emProgresso = 0, semDados = 0;
+
+  for (const [email, meta] of Object.entries(PLAQ_METAS)) {
+    const p = STATE.plaquinhas[email];
+    const fatTotal = p ? (p.fat_total || 0) : 0;
+    const plaqAtual = p ? (p.plaq_total || '—') : '—';
+    const desejada = meta.desejada;
+    const valorDesejado = TIER_VAL[desejada] || 0;
+    const valorAtual = fatTotal;
+    const delta = valorAtual - valorDesejado;
+    const pct = valorDesejado > 0 ? Math.min((valorAtual / valorDesejado) * 100, 999) : 0;
+
+    let status, statusClass, statusIcon;
+    if (valorAtual === 0) {
+      status = 'Sem comprovante'; statusClass = 'text3'; statusIcon = '⏳';
+      semDados++;
+    } else if (TIER_ORDER[plaqAtual] > TIER_ORDER[desejada]) {
+      status = 'Superou a meta'; statusClass = 'accent2'; statusIcon = '🚀';
+      superou++;
+    } else if (TIER_ORDER[plaqAtual] >= TIER_ORDER[desejada]) {
+      status = 'Meta atingida'; statusClass = 'green'; statusIcon = '✅';
+      atingiu++;
+    } else {
+      status = 'Em progresso'; statusClass = 'yellow'; statusIcon = '🔄';
+      emProgresso++;
+    }
+
+    rows.push({ nome: meta.nome, email, programa: meta.programa, desejada, plaqAtual, fatTotal: valorAtual, valorDesejado, delta, pct, status, statusClass, statusIcon });
+  }
+
+  // Sort: em progresso first, then sem dados, then atingiu, then superou
+  const statusOrder = { 'Em progresso': 0, 'Sem comprovante': 1, 'Meta atingida': 2, 'Superou a meta': 3 };
+  rows.sort((a, b) => (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9) || a.nome.localeCompare(b.nome, 'pt'));
+
+  let tableRows = rows.map((r, i) => {
+    const deltaColor = r.delta >= 0 ? 'var(--green)' : 'var(--red)';
+    const deltaText = r.delta >= 0 ? `+${fmt(r.delta)}` : fmt(r.delta);
+    const barWidth = Math.min(r.pct, 100);
+    const barColor = r.pct >= 100 ? 'var(--green)' : (r.pct >= 60 ? 'var(--yellow)' : 'var(--red)');
+
+    return `<tr style="border-bottom:1px solid var(--border)" data-status="${r.status}" data-programa="${r.programa}">
+      <td style="padding:8px 10px;font-size:12px;color:var(--text3)">${i+1}</td>
+      <td style="padding:8px 10px;font-size:13px;font-weight:500">${r.nome}</td>
+      <td style="padding:8px 10px;font-size:11px;color:var(--text3)">${r.programa}</td>
+      <td style="padding:8px 10px;text-align:center"><span class="badge" style="background:rgba(99,102,241,0.15);color:var(--accent2);font-size:12px">${r.desejada}</span></td>
+      <td style="padding:8px 10px;text-align:center"><span class="badge" style="background:${r.plaqAtual==='—'?'rgba(255,255,255,0.05)':'rgba(34,197,94,0.15)'};color:${r.plaqAtual==='—'?'var(--text3)':'var(--green)'};font-size:12px">${r.plaqAtual}</span></td>
+      <td style="padding:8px 10px;text-align:right;font-variant-numeric:tabular-nums;font-size:12px">${r.fatTotal > 0 ? fmt(r.fatTotal) : '—'}</td>
+      <td style="padding:8px 10px;text-align:right;font-variant-numeric:tabular-nums;font-size:12px;color:${deltaColor};font-weight:600">${r.fatTotal > 0 ? deltaText : '—'}</td>
+      <td style="padding:8px 10px;width:120px">
+        <div style="background:rgba(255,255,255,0.06);border-radius:4px;height:16px;position:relative;overflow:hidden">
+          <div style="background:${barColor};height:100%;width:${barWidth}%;border-radius:4px;transition:width 0.3s"></div>
+          <span style="position:absolute;top:0;left:50%;transform:translateX(-50%);font-size:9px;line-height:16px;color:#fff;font-weight:600">${r.pct.toFixed(0)}%</span>
+        </div>
+      </td>
+      <td style="padding:8px 10px;text-align:center;font-size:12px">
+        <span style="color:var(--${r.statusClass})">${r.statusIcon} ${r.status}</span>
+      </td>
+    </tr>`;
+  }).join('');
+
+  const total = rows.length;
+  const html = `
+    <div class="dash-grid" style="margin-bottom:20px">
+      <div class="dash-card green">
+        <div class="number">${atingiu + superou}</div>
+        <div class="label">Meta Atingida</div>
+        <div class="sub">${superou > 0 ? superou + ' superaram' : 'Comprovação confirmada'}</div>
+      </div>
+      <div class="dash-card yellow">
+        <div class="number">${emProgresso}</div>
+        <div class="label">Em Progresso</div>
+        <div class="sub">Faturamento abaixo da meta</div>
+      </div>
+      <div class="dash-card red">
+        <div class="number">${semDados}</div>
+        <div class="label">Sem Comprovante</div>
+        <div class="sub">Aguardando validação</div>
+      </div>
+      <div class="dash-card purple">
+        <div class="number">${total}</div>
+        <div class="label">Total Alunos</div>
+        <div class="sub">Com meta cadastrada</div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+      <select onchange="filterMetas()" id="metaStatusFilter" style="background:var(--card);color:var(--text);border:1px solid var(--border);padding:6px 10px;border-radius:6px;font-size:12px">
+        <option value="todos">Todos os status</option>
+        <option value="Meta atingida">✅ Meta atingida</option>
+        <option value="Superou a meta">🚀 Superou a meta</option>
+        <option value="Em progresso">🔄 Em progresso</option>
+        <option value="Sem comprovante">⏳ Sem comprovante</option>
+      </select>
+      <select onchange="filterMetas()" id="metaProgFilter" style="background:var(--card);color:var(--text);border:1px solid var(--border);padding:6px 10px;border-radius:6px;font-size:12px">
+        <option value="todos">Todos os programas</option>
+        <option value="Orion">Orion</option>
+        <option value="Atlas">Atlas</option>
+        <option value="Chronos">Chronos</option>
+        <option value="Chronos Journey">Chronos Journey</option>
+      </select>
+    </div>
+
+    <div class="table-wrap" style="max-height:600px;overflow-y:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr style="border-bottom:2px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:1">
+          <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text3);width:30px">#</th>
+          <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text3)">Aluno</th>
+          <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text3)">Programa</th>
+          <th style="padding:8px 10px;text-align:center;font-size:10px;color:var(--text3)">Meta</th>
+          <th style="padding:8px 10px;text-align:center;font-size:10px;color:var(--text3)">Comprovado</th>
+          <th style="padding:8px 10px;text-align:right;font-size:10px;color:var(--text3)">Fat. Total</th>
+          <th style="padding:8px 10px;text-align:right;font-size:10px;color:var(--text3)">Diferença</th>
+          <th style="padding:8px 10px;text-align:center;font-size:10px;color:var(--text3)">Progresso</th>
+          <th style="padding:8px 10px;text-align:center;font-size:10px;color:var(--text3)">Status</th>
+        </tr></thead>
+        <tbody id="metasTableBody">${tableRows}</tbody>
+      </table>
+    </div>
+  `;
+  document.getElementById('panel-metas').innerHTML = html;
+}
+
+function filterMetas() {
+  const status = document.getElementById('metaStatusFilter').value;
+  const prog = document.getElementById('metaProgFilter').value;
+  document.querySelectorAll('#metasTableBody tr').forEach(tr => {
+    const matchStatus = status === 'todos' || tr.dataset.status === status;
+    const matchProg = prog === 'todos' || tr.dataset.programa === prog;
+    tr.style.display = (matchStatus && matchProg) ? '' : 'none';
+  });
 }
 
 function renderLogistica() {
