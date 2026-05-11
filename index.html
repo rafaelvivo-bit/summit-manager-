@@ -2970,6 +2970,9 @@ function renderPlaquinhas() {
         <option value="">Todos</option>
         <option value="com-extrato">Com extrato</option>
         <option value="sem-extrato">Sem extrato</option>
+        <option value="nova">🆕 Novas (só manual)</option>
+        <option value="garantida">🏅 Garantidas (histórico)</option>
+        <option value="garantida-nova">🏅+✍️ Garantida + Manual</option>
       </select>
       <select id="plaq-filter-ptotal" onchange="filterPlaq()">
         <option value="">Plaq. Total: Todos</option>
@@ -3038,13 +3041,16 @@ function renderPlaquinhas() {
       plaqMData = mensais.map(m => m.tier.label).join(',');
     }
 
-    html += `<tr data-status="${hasExtrato ? 'com-extrato' : 'sem-extrato'}" data-ptotal="${plaqT}" data-pmensal="${plaqMData}">
+    const origin = hasGarantido && hasManual ? 'garantida-nova' : hasGarantido ? 'garantida' : hasManual ? 'nova' : '';
+    const rowBg = hasGarantido ? 'background:rgba(99,102,241,0.06);' : '';
+
+    html += `<tr data-status="${hasExtrato ? 'com-extrato' : 'sem-extrato'}" data-origin="${origin}" data-ptotal="${plaqT}" data-pmensal="${plaqMData}" style="${rowBg}">
       <td>${i+1}</td>
       <td>${a.nome}</td>
       <td style="font-size:11px">${a.email}</td>
       <td>${extratosHtml}</td>
       <td style="text-align:right;font-variant-numeric:tabular-nums" title="${hasGarantido ? 'Garantido: '+fmtFull(p.fat_garantido)+' + Manual: '+fmtFull(p.fat_manual||0) : ''}">${fatTotal > 0 ? fmtFull(fatTotal) + (hasGarantido ? ' 🏅' : '') : '—'}</td>
-      <td style="text-align:center">${plaqTHtml}</td>
+      <td style="text-align:center">${hasGarantido ? `<span class="badge" style="background:rgba(99,102,241,0.2);color:#a78bfa;border:1px solid rgba(99,102,241,0.3)">${ptier ? ptier.icon+' ' : ''}${plaqT} 🏅</span>` : plaqTHtml}</td>
       <td style="text-align:right;font-variant-numeric:tabular-nums">${fatMes > 0 ? fmtFull(fatMes) : '—'}</td>
       <td style="text-align:center">${plaqMHtml}</td>
       <td style="font-size:10px;max-width:220px">${(() => {
@@ -3673,12 +3679,29 @@ function filterPlaq() {
   const ptotalFilter = document.getElementById('plaq-filter-ptotal').value;
   const pmensalFilter = document.getElementById('plaq-filter-pmensal').value;
 
+  const originFilters = ['nova', 'garantida', 'garantida-nova'];
+
   const rows = document.querySelectorAll('#table-plaq tbody tr');
   let visible = 0;
   rows.forEach(tr => {
     const text = tr.textContent.toLowerCase();
     let show = !search || text.includes(search);
-    if (show && statusFilter) show = tr.dataset.status === statusFilter;
+
+    if (show && statusFilter) {
+      if (originFilters.includes(statusFilter)) {
+        // Filtrar por origem
+        const origin = tr.dataset.origin || '';
+        if (statusFilter === 'garantida') {
+          show = origin === 'garantida' || origin === 'garantida-nova';
+        } else if (statusFilter === 'nova') {
+          show = origin === 'nova';
+        } else if (statusFilter === 'garantida-nova') {
+          show = origin === 'garantida-nova';
+        }
+      } else {
+        show = tr.dataset.status === statusFilter;
+      }
+    }
 
     if (show && ptotalFilter) show = tr.dataset.ptotal === ptotalFilter;
     if (show && pmensalFilter) {
