@@ -2334,25 +2334,29 @@ function _getMaxTotalFromHist(hist) {
 }
 
 function getGuaranteedFatTotal(nomeAluno) {
-  const key = (nomeAluno||'').toLowerCase().trim();
+  const key = (nomeAluno||'').toLowerCase().trim().replace(/\s+/g,' ');
   if (typeof PLAQ_HISTORY === 'undefined' || !key) return 0;
 
   let maxVal = 0;
+  const norm = s => s.replace(/\s+/g,' ');
 
-  // 1) Match exato
+  // 1) Match exato (com e sem normalização de espaços)
   maxVal = Math.max(maxVal, _getMaxTotalFromHist(PLAQ_HISTORY[key]));
+  for (const [hName, hist] of Object.entries(PLAQ_HISTORY)) {
+    if (norm(hName) === key) maxVal = Math.max(maxVal, _getMaxTotalFromHist(hist));
+  }
 
-  // 2) Check aliases (ambos os sentidos)
-  const alias = PLAQ_NAME_ALIASES[key];
-  if (alias) maxVal = Math.max(maxVal, _getMaxTotalFromHist(PLAQ_HISTORY[alias]));
+  // 2) Check aliases (ambos os sentidos, com normalização)
   for (const [from, to] of Object.entries(PLAQ_NAME_ALIASES)) {
-    if (to === key) maxVal = Math.max(maxVal, _getMaxTotalFromHist(PLAQ_HISTORY[from]));
+    if (norm(from) === key) maxVal = Math.max(maxVal, _getMaxTotalFromHist(PLAQ_HISTORY[to]));
+    if (norm(to) === key) maxVal = Math.max(maxVal, _getMaxTotalFromHist(PLAQ_HISTORY[from]));
   }
 
   // 3) Substring match com validação de primeiro nome
   for (const [hName, hist] of Object.entries(PLAQ_HISTORY)) {
-    if (hName === key) continue;
-    if ((key.includes(hName) || hName.includes(key)) && key.split(' ')[0] === hName.split(' ')[0]) {
+    const hNorm = norm(hName);
+    if (hNorm === key) continue;
+    if ((key.includes(hNorm) || hNorm.includes(key)) && key.split(' ')[0] === hNorm.split(' ')[0]) {
       maxVal = Math.max(maxVal, _getMaxTotalFromHist(hist));
     }
   }
@@ -3081,9 +3085,11 @@ function renderPlaquinhas() {
     let plaqMHtml = '<span style="color:var(--text3)">—</span>';
     let plaqMData = '—';
     if (mensais.length > 0) {
-      plaqMHtml = mensais.map(m =>
-        `<span class="badge" style="background:rgba(245,158,11,0.15);color:var(--yellow);margin:1px">${m.tier.icon} ${m.tier.label}</span>`
-      ).join(' ');
+      plaqMHtml = mensais.map(m => {
+        const ver = getPlaqVersion(m.tier.label, a.nome);
+        const verTag = ver !== '1.0' ? ` <span style="font-size:9px;opacity:0.8">${ver}</span>` : '';
+        return `<span class="badge" style="background:rgba(245,158,11,0.15);color:var(--yellow);margin:1px">${m.tier.icon} ${m.tier.label}${verTag}</span>`;
+      }).join(' ');
       plaqMData = mensais.map(m => m.tier.label).join(',');
     }
 
@@ -3787,36 +3793,35 @@ const MENSAL_HAS_20 = new Set(['10K/mês','100K/mês','200K/mês','300K/mês','5
 const MENSAL_HAS_30 = new Set(['10K/mês','100K/mês']);
 
 function _findHistForAluno(nomeAluno) {
-  const key = (nomeAluno||'').toLowerCase().trim();
+  const key = (nomeAluno||'').toLowerCase().trim().replace(/\s+/g,' ');
   if (!key || typeof PLAQ_HISTORY === 'undefined') return null;
 
-  // Exato
+  const norm = s => s.replace(/\s+/g,' ');
+
+  // Exato (com normalização de espaços)
   if (PLAQ_HISTORY[key]) return PLAQ_HISTORY[key];
-
-  // Alias
-  const alias = PLAQ_NAME_ALIASES[key];
-  if (alias && PLAQ_HISTORY[alias]) return PLAQ_HISTORY[alias];
-  for (const [from, to] of Object.entries(PLAQ_NAME_ALIASES)) {
-    if (to === key && PLAQ_HISTORY[from]) {
-      // Merge both
-      const merged = {...PLAQ_HISTORY[from]};
-      if (PLAQ_HISTORY[key]) {
-        for (const [t, yrs] of Object.entries(PLAQ_HISTORY[key])) {
-          merged[t] = [...new Set([...(merged[t]||[]), ...yrs])];
-        }
-      }
-      return merged;
-    }
-  }
-
-  // Substring
   for (const [hName, hist] of Object.entries(PLAQ_HISTORY)) {
-    if (hName === key) continue;
-    if ((key.includes(hName) || hName.includes(key)) && key.split(' ')[0] === hName.split(' ')[0]) {
-      return hist;
+    if (norm(hName) === key) return hist;
+  }
+
+  // Alias (com normalização)
+  for (const [from, to] of Object.entries(PLAQ_NAME_ALIASES)) {
+    if (norm(from) === key && PLAQ_HISTORY[to]) return PLAQ_HISTORY[to];
+    if (norm(to) === key && PLAQ_HISTORY[from]) return PLAQ_HISTORY[from];
+  }
+
+  // Substring com merge de todos os matches
+  let bestHist = null;
+  let bestTotal = 0;
+  for (const [hName, hist] of Object.entries(PLAQ_HISTORY)) {
+    const hNorm = norm(hName);
+    if (hNorm === key) continue;
+    if ((key.includes(hNorm) || hNorm.includes(key)) && key.split(' ')[0] === hNorm.split(' ')[0]) {
+      const total = Object.keys(hist).filter(t => !t.includes('/mês')).length;
+      if (!bestHist || total > bestTotal) { bestHist = hist; bestTotal = total; }
     }
   }
-  return null;
+  return bestHist;
 }
 
 function getPlaqVersion(tierDisplay, nomeAluno) {
