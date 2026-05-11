@@ -3843,7 +3843,10 @@ function renderLogistica() {
 
   alunos.forEach(a => {
     const p = STATE.plaquinhas[a.email];
-    if (!p || (!p.extratos?.some(e => e.banco === 'Manual') && !p.fat_garantido)) return;
+    const hasManual = p?.extratos?.some(e => e.banco === 'Manual');
+    const hasGarantido = p?.fat_garantido > 0;
+    const hasHistMensal = !!_findHistForAluno(p?.nome || a.nome);
+    if (!p || (!hasManual && !hasGarantido && !hasHistMensal)) return;
 
     const nome = p.nome || a.nome;
     const details = { nome, email: a.email, placas: [] };
@@ -3857,10 +3860,13 @@ function renderLogistica() {
       details.placas.push({ tier, version: '1.0', type: 'total' });
     }
 
-    // Mensal — com versionamento baseado no histórico
+    // Mensal — combinar plaquinhas de extratos manuais + histórico garantido
+    const mensalAdded = new Set(); // track tiers already added
+
+    // 1) Mensais de extratos manuais
     if (p.plaq_mensais && p.plaq_mensais.length > 0) {
       p.plaq_mensais.forEach(m => {
-        const tierLabel = m.tier.label; // e.g. "40K/mês"
+        const tierLabel = m.tier.label;
         const version = getPlaqVersion(tierLabel, nome);
         const displayKey = version === '1.0' ? tierLabel : `${tierLabel} ${version}`;
 
@@ -3868,7 +3874,28 @@ function renderLogistica() {
         demand[displayKey].count++;
         demand[displayKey].alunos.push(nome);
         details.placas.push({ tier: tierLabel, version, type: 'mensal' });
+        mensalAdded.add(tierLabel);
       });
+    }
+
+    // 2) Mensais garantidas do histórico (que não vieram dos extratos manuais)
+    const hist = _findHistForAluno(nome);
+    if (hist) {
+      for (const [tierKey, years] of Object.entries(hist)) {
+        if (!tierKey.includes('/mês')) continue; // só mensais
+        if (mensalAdded.has(tierKey)) continue;  // já contabilizado acima
+        // Verificar se é um tier válido atual
+        const tierObj = PLAQ_MENSAL_TIERS.find(t => t.label === tierKey);
+        if (!tierObj) continue; // tier não existe mais (ex: 10K/mês)
+        const version = getPlaqVersion(tierKey, nome);
+        const displayKey = version === '1.0' ? tierKey : `${tierKey} ${version}`;
+
+        if (!demand[displayKey]) demand[displayKey] = { count:0, alunos:[] };
+        demand[displayKey].count++;
+        demand[displayKey].alunos.push(nome);
+        details.placas.push({ tier: tierKey, version, type: 'mensal' });
+        mensalAdded.add(tierKey);
+      }
     }
 
     if (details.placas.length > 0) alunoPlaqDetails.push(details);
