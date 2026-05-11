@@ -408,9 +408,9 @@ function logout() {
 function recalcAllPlaquinhas() {
   for (const [email, plaq] of Object.entries(STATE.plaquinhas)) {
     if (!plaq.extratos || !plaq.extratos.length) continue;
-    // Consolidar meses de todos os extratos (somar se mesmo mês em bancos diferentes)
+    // Considerar APENAS extratos manuais para cálculo de plaquinhas
     const mesesConsolidado = {};
-    plaq.extratos.forEach(ext => {
+    plaq.extratos.filter(e => e.banco === 'Manual').forEach(ext => {
       if (!ext.meses) return;
       for (const [m, v] of Object.entries(ext.meses)) {
         mesesConsolidado[m] = (mesesConsolidado[m] || 0) + v;
@@ -2301,9 +2301,9 @@ function recalcAlunoPlaquinhas(email) {
   if (!plaq) return;
   if (!plaq.extratos || plaq.extratos.length === 0) return;
 
-  // Consolidar meses de todos os extratos
+  // Considerar APENAS extratos manuais para cálculo de plaquinhas
   const mesesConsolidado = {};
-  plaq.extratos.forEach(ext => {
+  plaq.extratos.filter(e => e.banco === 'Manual').forEach(ext => {
     if (!ext.meses) return;
     for (const [m, v] of Object.entries(ext.meses)) {
       mesesConsolidado[m] = (mesesConsolidado[m] || 0) + v;
@@ -2850,8 +2850,8 @@ function renderMansaoTable() {
 function renderPlaquinhas() {
   const alunos = STATE.summit.filter(p => p.segmento === 'Aluno').sort((a,b) => a.nome.localeCompare(b.nome,'pt'));
 
-  // Stats
-  const comExtrato = alunos.filter(a => STATE.plaquinhas[a.email]?.extratos?.length > 0).length;
+  // Stats — considerar apenas extratos manuais
+  const comExtrato = alunos.filter(a => STATE.plaquinhas[a.email]?.extratos?.some(e => e.banco === 'Manual')).length;
   const semExtrato = alunos.length - comExtrato;
 
   // Count plaquinhas by tier
@@ -2864,7 +2864,7 @@ function renderPlaquinhas() {
 
   alunos.forEach(a => {
     const p = STATE.plaquinhas[a.email];
-    if (!p || !p.extratos?.length) return;
+    if (!p || !p.extratos?.some(e => e.banco === 'Manual')) return;
     if (p.plaq_total && p.plaq_total !== '—') totalTierCount[p.plaq_total] = (totalTierCount[p.plaq_total]||0) + 1;
     if (p.plaq_mensais && p.plaq_mensais.length > 0) {
       p.plaq_mensais.forEach(m => {
@@ -2970,10 +2970,10 @@ function renderPlaquinhas() {
 
   alunos.forEach((a, i) => {
     const p = STATE.plaquinhas[a.email] || {};
-    const extratos = p.extratos || [];
+    const extratos = (p.extratos || []).filter(e => e.banco === 'Manual');
     const hasExtrato = extratos.length > 0;
 
-    // Extratos chips
+    // Extratos chips — apenas manuais
     let extratosHtml = '';
     if (hasExtrato) {
       extratosHtml = extratos.map(ext =>
@@ -3830,7 +3830,7 @@ function exportData() {
   // Sem Comprovante
   const semComprov = STATE.summit.filter(p => p.segmento === 'Aluno').filter(p => {
     const plaq = STATE.plaquinhas[p.email];
-    return !plaq || !plaq.extratos || plaq.extratos.length === 0;
+    return !plaq || !plaq.extratos || !plaq.extratos.some(e => e.banco === 'Manual');
   }).map((p, i) => ({
     '#': i+1,
     'Nome': p.nome,
