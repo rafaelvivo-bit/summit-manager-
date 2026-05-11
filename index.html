@@ -950,14 +950,18 @@ function classifyPlaquinhaMensal(valor) {
 
 // Regra de Acúmulo: retorna todos os tiers DISTINTOS atingidos em meses diferentes
 function classifyPlaquinhasMensaisAcumulo(byMonth) {
-  const achievedTiers = new Map(); // label -> {tier, months:[]}
+  const achievedTiers = new Map(); // label -> {tier, months:[], value}
   for (const [month, value] of Object.entries(byMonth)) {
-    const tier = classifyPlaquinhaMensal(value);
-    if (tier) {
-      if (!achievedTiers.has(tier.label)) {
-        achievedTiers.set(tier.label, { tier, months: [] });
+    // Para cada mês, registrar TODOS os tiers que o valor atinge (não só o maior)
+    for (const tier of PLAQ_MENSAL_TIERS) {
+      if (value >= tier.min) {
+        if (!achievedTiers.has(tier.label)) {
+          achievedTiers.set(tier.label, { tier, months: [], value: 0 });
+        }
+        const entry = achievedTiers.get(tier.label);
+        entry.months.push(month);
+        if (value > entry.value) entry.value = value;
       }
-      achievedTiers.get(tier.label).months.push(month);
     }
   }
   // Retorna array de tiers distintos (ordenados do maior para menor)
