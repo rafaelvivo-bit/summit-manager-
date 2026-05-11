@@ -406,29 +406,35 @@ function logout() {
 
 // Recalcular plaquinhas de todos os alunos a partir de STATE.plaquinhas[email].extratos
 function recalcAllPlaquinhas() {
-  for (const [email, plaq] of Object.entries(STATE.plaquinhas)) {
-    if (!plaq.extratos || !plaq.extratos.length) continue;
-    // Considerar APENAS extratos manuais para cálculo de plaquinhas
-    const mesesConsolidado = {};
-    plaq.extratos.filter(e => e.banco === 'Manual').forEach(ext => {
-      if (!ext.meses) return;
-      for (const [m, v] of Object.entries(ext.meses)) {
-        mesesConsolidado[m] = (mesesConsolidado[m] || 0) + v;
+  // Recalcular todos os alunos que têm plaquinhas entry
+  for (const email of Object.keys(STATE.plaquinhas)) {
+    recalcAlunoPlaquinhas(email);
+  }
+
+  // Garantir que alunos com histórico de fat. total mas sem entry ainda recebam o garantido
+  if (typeof PLAQ_HISTORY !== 'undefined') {
+    const alunosSummit = STATE.summit || [];
+    for (const aluno of alunosSummit) {
+      if (aluno.segmento !== 'Aluno') continue;
+      if (STATE.plaquinhas[aluno.email]) continue; // já processado
+      const garantido = getGuaranteedFatTotal(aluno.nome);
+      if (garantido > 0) {
+        STATE.plaquinhas[aluno.email] = {
+          nome: aluno.nome,
+          extratos: [],
+          meses: {},
+          fat_garantido: garantido,
+          fat_manual: 0,
+          fat_total: garantido,
+          fat_maior_mes: 0,
+          plaq_total: classifyPlaquinhaTotal(garantido)?.label || '—',
+          plaq_mensais: [],
+          plaq_mensal_labels: [],
+          plaq_mensal: '—',
+          qtd_plaquinhas_mensais: 0
+        };
       }
-    });
-    plaq.meses = mesesConsolidado;
-    const monthValues = Object.values(mesesConsolidado);
-    plaq.fat_total = monthValues.reduce((s,v) => s+v, 0);
-    plaq.fat_maior_mes = monthValues.length ? Math.max(...monthValues) : 0;
-
-    const ptier = classifyPlaquinhaTotal(plaq.fat_total);
-    plaq.plaq_total = ptier ? ptier.label : '—';
-
-    const mensaisAcumulo = classifyPlaquinhasMensaisAcumulo(mesesConsolidado);
-    plaq.plaq_mensais = mensaisAcumulo;
-    plaq.plaq_mensal_labels = mensaisAcumulo.map(m => m.tier.label);
-    plaq.plaq_mensal = mensaisAcumulo.length ? mensaisAcumulo[0].tier.label : '—';
-    plaq.qtd_plaquinhas_mensais = mensaisAcumulo.length;
+    }
   }
   saveState();
 }
@@ -2296,14 +2302,31 @@ function removeExtrato(email, extratoId) {
   });
 }
 
+// Mapeamento tier label → valor nominal para fat. total garantido
+const TIER_NOMINAL = {'50K':50000,'100K':100000,'200K':200000,'350K':350000,'500K':500000,'750K':750000,'1M':1000000,'2M':2000000,'3M':3000000,'4M':4000000,'5M':5000000};
+
+function getGuaranteedFatTotal(nomeAluno) {
+  const key = (nomeAluno||'').toLowerCase().trim();
+  if (typeof PLAQ_HISTORY === 'undefined') return 0;
+  const hist = PLAQ_HISTORY[key];
+  if (!hist) return 0;
+  // Pegar o maior tier de fat. total (chaves sem "/mês")
+  let maxVal = 0;
+  for (const tier of Object.keys(hist)) {
+    if (tier.includes('/mês')) continue; // pular mensais
+    const nominal = TIER_NOMINAL[tier] || 0;
+    if (nominal > maxVal) maxVal = nominal;
+  }
+  return maxVal;
+}
+
 function recalcAlunoPlaquinhas(email) {
   const plaq = STATE.plaquinhas[email];
   if (!plaq) return;
-  if (!plaq.extratos || plaq.extratos.length === 0) return;
 
   // Considerar APENAS extratos manuais para cálculo de plaquinhas
   const mesesConsolidado = {};
-  plaq.extratos.filter(e => e.banco === 'Manual').forEach(ext => {
+  (plaq.extratos || []).filter(e => e.banco === 'Manual').forEach(ext => {
     if (!ext.meses) return;
     for (const [m, v] of Object.entries(ext.meses)) {
       mesesConsolidado[m] = (mesesConsolidado[m] || 0) + v;
@@ -2312,11 +2335,17 @@ function recalcAlunoPlaquinhas(email) {
 
   plaq.meses = mesesConsolidado;
   const monthValues = Object.values(mesesConsolidado);
-  plaq.fat_total = monthValues.reduce((s, v) => s + v, 0);
+  const fatManual = monthValues.reduce((s, v) => s + v, 0);
   plaq.fat_maior_mes = monthValues.length ? Math.max(...monthValues) : 0;
 
+  // Fat. total = garantido de anos anteriores + faturamento manual novo
+  const garantido = getGuaranteedFatTotal(plaq.nome || '');
+  plaq.fat_garantido = garantido;
+  plaq.fat_manual = fatManual;
+  plaq.fat_total = garantido + fatManual;
+
   const ptier = classifyPlaquinhaTotal(plaq.fat_total);
-  plaq.plaq_total = ptier ? ptier.label : '—';
+  plaq.plaq_total = ptier ? ptier.label : (garantido > 0 ? classifyPlaquinhaTotal(garantido)?.label || '—' : '—');
 
   const mensaisAcumulo = classifyPlaquinhasMensaisAcumulo(mesesConsolidado);
   plaq.plaq_mensais = mensaisAcumulo;
@@ -2850,8 +2879,11 @@ function renderMansaoTable() {
 function renderPlaquinhas() {
   const alunos = STATE.summit.filter(p => p.segmento === 'Aluno').sort((a,b) => a.nome.localeCompare(b.nome,'pt'));
 
-  // Stats — considerar apenas extratos manuais
-  const comExtrato = alunos.filter(a => STATE.plaquinhas[a.email]?.extratos?.some(e => e.banco === 'Manual')).length;
+  // Stats — extratos manuais + garantido histórico
+  const comExtrato = alunos.filter(a => {
+    const p = STATE.plaquinhas[a.email];
+    return p && (p.extratos?.some(e => e.banco === 'Manual') || p.fat_garantido > 0);
+  }).length;
   const semExtrato = alunos.length - comExtrato;
 
   // Count plaquinhas by tier
@@ -2864,7 +2896,7 @@ function renderPlaquinhas() {
 
   alunos.forEach(a => {
     const p = STATE.plaquinhas[a.email];
-    if (!p || !p.extratos?.some(e => e.banco === 'Manual')) return;
+    if (!p || (!p.extratos?.some(e => e.banco === 'Manual') && !p.fat_garantido)) return;
     if (p.plaq_total && p.plaq_total !== '—') totalTierCount[p.plaq_total] = (totalTierCount[p.plaq_total]||0) + 1;
     if (p.plaq_mensais && p.plaq_mensais.length > 0) {
       p.plaq_mensais.forEach(m => {
@@ -2971,17 +3003,23 @@ function renderPlaquinhas() {
   alunos.forEach((a, i) => {
     const p = STATE.plaquinhas[a.email] || {};
     const extratos = (p.extratos || []).filter(e => e.banco === 'Manual');
-    const hasExtrato = extratos.length > 0;
+    const hasManual = extratos.length > 0;
+    const hasGarantido = (p.fat_garantido || 0) > 0;
+    const hasExtrato = hasManual || hasGarantido;
 
-    // Extratos chips — apenas manuais
+    // Extratos chips — manuais + indicador garantido
     let extratosHtml = '';
-    if (hasExtrato) {
-      extratosHtml = extratos.map(ext =>
-        `<span class="extrato-chip" title="${ext.periodo || ext.filename}">${ext.banco} <span class="remove-btn" onclick="event.stopPropagation();removeExtrato('${a.email}',${ext.id})">×</span></span>`
-      ).join('');
-    } else {
-      extratosHtml = '<span style="color:var(--text3);font-size:11px">Nenhum</span>';
+    const chips = [];
+    if (hasGarantido) {
+      const gTier = classifyPlaquinhaTotal(p.fat_garantido);
+      chips.push(`<span class="extrato-chip" style="background:rgba(99,102,241,0.15);color:var(--accent2);border-color:rgba(99,102,241,0.3)" title="Garantido de anos anteriores">🏅 ${gTier ? gTier.label : 'Hist.'}</span>`);
     }
+    if (hasManual) {
+      extratos.forEach(ext => {
+        chips.push(`<span class="extrato-chip" title="${ext.periodo || ext.filename}">${ext.banco} <span class="remove-btn" onclick="event.stopPropagation();removeExtrato('${a.email}',${ext.id})">×</span></span>`);
+      });
+    }
+    extratosHtml = chips.length > 0 ? chips.join('') : '<span style="color:var(--text3);font-size:11px">Nenhum</span>';
 
     const fatTotal = p.fat_total || 0;
     const fatMes = p.fat_maior_mes || 0;
@@ -3005,7 +3043,7 @@ function renderPlaquinhas() {
       <td>${a.nome}</td>
       <td style="font-size:11px">${a.email}</td>
       <td>${extratosHtml}</td>
-      <td style="text-align:right;font-variant-numeric:tabular-nums">${fatTotal > 0 ? fmtFull(fatTotal) : '—'}</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums" title="${hasGarantido ? 'Garantido: '+fmtFull(p.fat_garantido)+' + Manual: '+fmtFull(p.fat_manual||0) : ''}">${fatTotal > 0 ? fmtFull(fatTotal) + (hasGarantido ? ' 🏅' : '') : '—'}</td>
       <td style="text-align:center">${plaqTHtml}</td>
       <td style="text-align:right;font-variant-numeric:tabular-nums">${fatMes > 0 ? fmtFull(fatMes) : '—'}</td>
       <td style="text-align:center">${plaqMHtml}</td>
@@ -3470,15 +3508,21 @@ function showPlaqKpiModal(filter) {
     filtered = alunos;
     title = 'Alunos Confirmados'; icon = '👥'; color = 'var(--accent2)';
   } else if (filter === 'com-extrato') {
-    filtered = alunos.filter(a => STATE.plaquinhas[a.email]?.extratos?.some(e => e.banco === 'Manual'));
+    filtered = alunos.filter(a => {
+      const p = STATE.plaquinhas[a.email];
+      return p && (p.extratos?.some(e => e.banco === 'Manual') || p.fat_garantido > 0);
+    });
     title = 'Com Extrato Anexado'; icon = '✅'; color = 'var(--green)';
   } else if (filter === 'sem-extrato') {
-    filtered = alunos.filter(a => !STATE.plaquinhas[a.email]?.extratos?.some(e => e.banco === 'Manual'));
+    filtered = alunos.filter(a => {
+      const p = STATE.plaquinhas[a.email];
+      return !p || (!p.extratos?.some(e => e.banco === 'Manual') && !(p.fat_garantido > 0));
+    });
     title = 'Sem Extrato'; icon = '⚠️'; color = 'var(--red)';
   } else if (filter === 'total-plaquinhas') {
     filtered = alunos.filter(a => {
       const p = STATE.plaquinhas[a.email];
-      if (!p || !p.extratos?.some(e => e.banco === 'Manual')) return false;
+      if (!p || (!p.extratos?.some(e => e.banco === 'Manual') && !(p.fat_garantido > 0))) return false;
       return (p.plaq_total && p.plaq_total !== '—') || (p.plaq_mensais && p.plaq_mensais.length > 0);
     });
     title = 'Total Plaquinhas'; icon = '🏆'; color = 'var(--yellow)';
@@ -3900,7 +3944,7 @@ function exportData() {
   // Sem Comprovante
   const semComprov = STATE.summit.filter(p => p.segmento === 'Aluno').filter(p => {
     const plaq = STATE.plaquinhas[p.email];
-    return !plaq || !plaq.extratos || !plaq.extratos.some(e => e.banco === 'Manual');
+    return !plaq || (!plaq.extratos?.some(e => e.banco === 'Manual') && !(plaq.fat_garantido > 0));
   }).map((p, i) => ({
     '#': i+1,
     'Nome': p.nome,
