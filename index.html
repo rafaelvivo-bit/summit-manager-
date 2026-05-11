@@ -2305,18 +2305,54 @@ function removeExtrato(email, extratoId) {
 // Mapeamento tier label → valor nominal para fat. total garantido
 const TIER_NOMINAL = {'50K':50000,'100K':100000,'200K':200000,'350K':350000,'500K':500000,'750K':750000,'1M':1000000,'2M':2000000,'3M':3000000,'4M':4000000,'5M':5000000};
 
-function getGuaranteedFatTotal(nomeAluno) {
-  const key = (nomeAluno||'').toLowerCase().trim();
-  if (typeof PLAQ_HISTORY === 'undefined') return 0;
-  const hist = PLAQ_HISTORY[key];
+// Aliases: nomes conhecidos que são a mesma pessoa (nome curto → nome longo ou vice-versa)
+const PLAQ_NAME_ALIASES = {
+  'bruno crosara itagiba': 'bruno itagiba',
+  'renato marques lorenzon': 'renato lorenzon',
+  'vitor de castro': 'vitor castro',
+  'arthur de souza': 'arthur souza',
+  'isis orona e nathan cândido': 'isis orona',
+  'natália aresi ceolin': 'natália ceolin',
+  'ademir ferreira junior': 'ademir ferreira',
+  'juliana carvalho e hernany sathler  ( novo comprovante total)': 'juliana carvalho e hernany sathler',
+  'rithelle paixão': 'rithelle paixao',
+};
+
+function _getMaxTotalFromHist(hist) {
   if (!hist) return 0;
-  // Pegar o maior tier de fat. total (chaves sem "/mês")
   let maxVal = 0;
   for (const tier of Object.keys(hist)) {
-    if (tier.includes('/mês')) continue; // pular mensais
+    if (tier.includes('/mês')) continue;
     const nominal = TIER_NOMINAL[tier] || 0;
     if (nominal > maxVal) maxVal = nominal;
   }
+  return maxVal;
+}
+
+function getGuaranteedFatTotal(nomeAluno) {
+  const key = (nomeAluno||'').toLowerCase().trim();
+  if (typeof PLAQ_HISTORY === 'undefined' || !key) return 0;
+
+  let maxVal = 0;
+
+  // 1) Match exato
+  maxVal = Math.max(maxVal, _getMaxTotalFromHist(PLAQ_HISTORY[key]));
+
+  // 2) Check aliases (ambos os sentidos)
+  const alias = PLAQ_NAME_ALIASES[key];
+  if (alias) maxVal = Math.max(maxVal, _getMaxTotalFromHist(PLAQ_HISTORY[alias]));
+  for (const [from, to] of Object.entries(PLAQ_NAME_ALIASES)) {
+    if (to === key) maxVal = Math.max(maxVal, _getMaxTotalFromHist(PLAQ_HISTORY[from]));
+  }
+
+  // 3) Substring match com validação de primeiro nome
+  for (const [hName, hist] of Object.entries(PLAQ_HISTORY)) {
+    if (hName === key) continue;
+    if ((key.includes(hName) || hName.includes(key)) && key.split(' ')[0] === hName.split(' ')[0]) {
+      maxVal = Math.max(maxVal, _getMaxTotalFromHist(hist));
+    }
+  }
+
   return maxVal;
 }
 
@@ -3737,9 +3773,41 @@ const PLAQ_ESTOQUE = {
 const MENSAL_HAS_20 = new Set(['10K/mês','100K/mês','200K/mês','300K/mês','500K/mês']);
 const MENSAL_HAS_30 = new Set(['10K/mês','100K/mês']);
 
-function getPlaqVersion(tierDisplay, nomeAluno) {
+function _findHistForAluno(nomeAluno) {
   const key = (nomeAluno||'').toLowerCase().trim();
-  const hist = PLAQ_HISTORY[key];
+  if (!key || typeof PLAQ_HISTORY === 'undefined') return null;
+
+  // Exato
+  if (PLAQ_HISTORY[key]) return PLAQ_HISTORY[key];
+
+  // Alias
+  const alias = PLAQ_NAME_ALIASES[key];
+  if (alias && PLAQ_HISTORY[alias]) return PLAQ_HISTORY[alias];
+  for (const [from, to] of Object.entries(PLAQ_NAME_ALIASES)) {
+    if (to === key && PLAQ_HISTORY[from]) {
+      // Merge both
+      const merged = {...PLAQ_HISTORY[from]};
+      if (PLAQ_HISTORY[key]) {
+        for (const [t, yrs] of Object.entries(PLAQ_HISTORY[key])) {
+          merged[t] = [...new Set([...(merged[t]||[]), ...yrs])];
+        }
+      }
+      return merged;
+    }
+  }
+
+  // Substring
+  for (const [hName, hist] of Object.entries(PLAQ_HISTORY)) {
+    if (hName === key) continue;
+    if ((key.includes(hName) || hName.includes(key)) && key.split(' ')[0] === hName.split(' ')[0]) {
+      return hist;
+    }
+  }
+  return null;
+}
+
+function getPlaqVersion(tierDisplay, nomeAluno) {
+  const hist = _findHistForAluno(nomeAluno);
   if (!hist || !hist[tierDisplay]) return '1.0';
   const priorYears = hist[tierDisplay].length;
   if (priorYears >= 2 && MENSAL_HAS_30.has(tierDisplay)) return '3.0';
