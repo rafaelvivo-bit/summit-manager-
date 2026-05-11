@@ -3617,6 +3617,25 @@ function exportData() {
     XLSX.utils.book_append_sheet(wb, ws3, 'Plaquinhas');
   }
 
+  // Sem Comprovante
+  const semComprov = STATE.summit.filter(p => p.segmento === 'Aluno').filter(p => {
+    const plaq = STATE.plaquinhas[p.email];
+    return !plaq || !plaq.extratos || plaq.extratos.length === 0;
+  }).map((p, i) => ({
+    '#': i+1,
+    'Nome': p.nome,
+    'E-mail': p.email,
+    'Programa': p.programa,
+    'Telefone': p.telefone,
+    'Tier': p.tierMax,
+    'Estrategista': p.estrategista || '—'
+  }));
+  if (semComprov.length) {
+    const ws4 = XLSX.utils.json_to_sheet(semComprov);
+    ws4['!cols'] = [{wch:5},{wch:35},{wch:35},{wch:20},{wch:18},{wch:10},{wch:20}];
+    XLSX.utils.book_append_sheet(wb, ws4, 'Sem Comprovante');
+  }
+
   XLSX.writeFile(wb, 'Summit_NSF_2026_Export.xlsx');
   toast('Exportado com sucesso!');
 }
