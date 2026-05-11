@@ -3843,7 +3843,7 @@ function renderLogistica() {
 
   alunos.forEach(a => {
     const p = STATE.plaquinhas[a.email];
-    if (!p || !p.extratos?.length) return;
+    if (!p || (!p.extratos?.some(e => e.banco === 'Manual') && !p.fat_garantido)) return;
 
     const nome = p.nome || a.nome;
     const details = { nome, email: a.email, placas: [] };
