@@ -2383,11 +2383,22 @@ function recalcAlunoPlaquinhas(email) {
   const fatManual = monthValues.reduce((s, v) => s + v, 0);
   plaq.fat_maior_mes = monthValues.length ? Math.max(...monthValues) : 0;
 
-  // Fat. total = o MAIOR entre garantido (piso histórico) e manual (mai-mai)
+  // Separar meses novos (>=Mai/25) vs históricos (<Mai/25)
+  const CUTOFF = '2025-05';
+  let fatNovo = 0, fatHistorico = 0;
+  for (const [m, v] of Object.entries(mesesConsolidado)) {
+    if (m >= CUTOFF) fatNovo += v;
+    else fatHistorico += v;
+  }
+
+  // Fat. total: base_histórica + faturamento_novo
+  // base_histórica = max(garantido, comprovantes_meses_antigos)
   const garantido = getGuaranteedFatTotal(plaq.nome || '');
   plaq.fat_garantido = garantido;
   plaq.fat_manual = fatManual;
-  plaq.fat_total = Math.max(garantido, fatManual);
+  plaq.fat_novo = fatNovo;
+  plaq.fat_historico = fatHistorico;
+  plaq.fat_total = Math.max(garantido, fatHistorico) + fatNovo;
 
   const ptier = classifyPlaquinhaTotal(plaq.fat_total);
   plaq.plaq_total = ptier ? ptier.label : (garantido > 0 ? classifyPlaquinhaTotal(garantido)?.label || '—' : '—');
