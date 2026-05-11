@@ -2915,14 +2915,15 @@ function renderMansaoTable() {
 function renderPlaquinhas() {
   const alunos = STATE.summit.filter(p => p.segmento === 'Aluno').sort((a,b) => a.nome.localeCompare(b.nome,'pt'));
 
-  // Stats — extratos manuais + garantido histórico
-  const comExtrato = alunos.filter(a => {
+  // Stats — APENAS validações manuais (garantido não conta nos KPIs)
+  const comManual = alunos.filter(a => STATE.plaquinhas[a.email]?.extratos?.some(e => e.banco === 'Manual')).length;
+  const comGarantido = alunos.filter(a => {
     const p = STATE.plaquinhas[a.email];
-    return p && (p.extratos?.some(e => e.banco === 'Manual') || p.fat_garantido > 0);
+    return p && p.fat_garantido > 0 && !p.extratos?.some(e => e.banco === 'Manual');
   }).length;
-  const semExtrato = alunos.length - comExtrato;
+  const semExtrato = alunos.length - comManual - comGarantido;
 
-  // Count plaquinhas by tier
+  // Count plaquinhas — APENAS alunos com validação manual
   const totalTierCount = {};
   const mensalTierCount = {};
   PLAQ_TOTAL_TIERS.forEach(t => totalTierCount[t.label] = 0);
@@ -2932,7 +2933,7 @@ function renderPlaquinhas() {
 
   alunos.forEach(a => {
     const p = STATE.plaquinhas[a.email];
-    if (!p || (!p.extratos?.some(e => e.banco === 'Manual') && !p.fat_garantido)) return;
+    if (!p || !p.extratos?.some(e => e.banco === 'Manual')) return;
     if (p.plaq_total && p.plaq_total !== '—') totalTierCount[p.plaq_total] = (totalTierCount[p.plaq_total]||0) + 1;
     if (p.plaq_mensais && p.plaq_mensais.length > 0) {
       p.plaq_mensais.forEach(m => {
@@ -2956,18 +2957,23 @@ function renderPlaquinhas() {
         <div class="label">Alunos Confirmados</div>
       </div>
       <div class="dash-card green" style="cursor:pointer" onclick="showPlaqKpiModal('com-extrato')">
-        <div class="number">${comExtrato}</div>
-        <div class="label">Com Extrato Anexado</div>
-        <div class="sub">${alunos.length ? ((comExtrato/alunos.length)*100).toFixed(1) : 0}%</div>
+        <div class="number">${comManual}</div>
+        <div class="label">Validação Manual</div>
+        <div class="sub">${alunos.length ? ((comManual/alunos.length)*100).toFixed(1) : 0}%</div>
       </div>
       <div class="dash-card yellow" style="cursor:pointer" onclick="showPlaqKpiModal('total-plaquinhas')">
         <div class="number">${totalPlaquinhas + totalMensal}</div>
-        <div class="label">Total Plaquinhas</div>
+        <div class="label">Plaquinhas (Manual)</div>
         <div class="sub">${totalPlaquinhas} total + ${totalMensal} mensal</div>
+      </div>
+      <div class="dash-card" style="cursor:pointer;border-top:3px solid var(--accent2)" onclick="showPlaqKpiModal('garantida')">
+        <div class="number" style="color:var(--accent2)">${comGarantido}</div>
+        <div class="label">Só Garantida (Histórico)</div>
+        <div class="sub">Aguardando validação manual</div>
       </div>
       <div class="dash-card red" style="cursor:pointer" onclick="showPlaqKpiModal('sem-extrato')">
         <div class="number">${semExtrato}</div>
-        <div class="label">Sem Extrato</div>
+        <div class="label">Sem Nada</div>
       </div>
     </div>
 
@@ -3550,24 +3556,27 @@ function showPlaqKpiModal(filter) {
     filtered = alunos;
     title = 'Alunos Confirmados'; icon = '👥'; color = 'var(--accent2)';
   } else if (filter === 'com-extrato') {
+    filtered = alunos.filter(a => STATE.plaquinhas[a.email]?.extratos?.some(e => e.banco === 'Manual'));
+    title = 'Validação Manual'; icon = '✅'; color = 'var(--green)';
+  } else if (filter === 'garantida') {
     filtered = alunos.filter(a => {
       const p = STATE.plaquinhas[a.email];
-      return p && (p.extratos?.some(e => e.banco === 'Manual') || p.fat_garantido > 0);
+      return p && p.fat_garantido > 0 && !p.extratos?.some(e => e.banco === 'Manual');
     });
-    title = 'Com Extrato Anexado'; icon = '✅'; color = 'var(--green)';
+    title = 'Só Garantida (Histórico)'; icon = '🏅'; color = 'var(--accent2)';
   } else if (filter === 'sem-extrato') {
     filtered = alunos.filter(a => {
       const p = STATE.plaquinhas[a.email];
       return !p || (!p.extratos?.some(e => e.banco === 'Manual') && !(p.fat_garantido > 0));
     });
-    title = 'Sem Extrato'; icon = '⚠️'; color = 'var(--red)';
+    title = 'Sem Nada'; icon = '⚠️'; color = 'var(--red)';
   } else if (filter === 'total-plaquinhas') {
     filtered = alunos.filter(a => {
       const p = STATE.plaquinhas[a.email];
-      if (!p || (!p.extratos?.some(e => e.banco === 'Manual') && !(p.fat_garantido > 0))) return false;
+      if (!p || !p.extratos?.some(e => e.banco === 'Manual')) return false;
       return (p.plaq_total && p.plaq_total !== '—') || (p.plaq_mensais && p.plaq_mensais.length > 0);
     });
-    title = 'Total Plaquinhas'; icon = '🏆'; color = 'var(--yellow)';
+    title = 'Plaquinhas (Manual)'; icon = '🏆'; color = 'var(--yellow)';
   }
 
   let rows = filtered.map((a, i) => {
@@ -4035,7 +4044,7 @@ function exportData() {
   // Sem Comprovante
   const semComprov = STATE.summit.filter(p => p.segmento === 'Aluno').filter(p => {
     const plaq = STATE.plaquinhas[p.email];
-    return !plaq || (!plaq.extratos?.some(e => e.banco === 'Manual') && !(plaq.fat_garantido > 0));
+    return !plaq || !plaq.extratos?.some(e => e.banco === 'Manual');
   }).map((p, i) => ({
     '#': i+1,
     'Nome': p.nome,
