@@ -2287,7 +2287,13 @@ function removeExtrato(email, extratoId) {
     recalcAlunoPlaquinhas(email);
   }
   saveState();
+  const wrap = document.querySelector('#panel-plaquinhas .table-wrap');
+  const scrollPos = wrap ? wrap.scrollTop : 0;
   renderAll();
+  requestAnimationFrame(() => {
+    const wrap2 = document.querySelector('#panel-plaquinhas .table-wrap');
+    if (wrap2) wrap2.scrollTop = scrollPos;
+  });
 }
 
 function recalcAlunoPlaquinhas(email) {
