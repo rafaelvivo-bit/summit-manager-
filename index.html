@@ -932,7 +932,7 @@ const PLAQ_MENSAL_TIERS = [
   { label: '300K/mês', min: 270000, icon: '💎' },
   { label: '200K/mês', min: 180000, icon: '🔥' },
   { label: '100K/mês', min: 90000,  icon: '🌟' },
-  { label: '40K/mês',  min: 36000,  icon: '✨' },
+  { label: '40K/mês',  min: 36000,  icon: '✨', display: '10K/semana (40K/mês)' },
 ];
 
 function classifyPlaquinhaTotal(total) {
@@ -3089,7 +3089,7 @@ function renderPlaquinhas() {
       plaqMHtml = mensais.map(m => {
         const ver = getPlaqVersion(m.tier.label, a.nome);
         const verTag = ver !== '1.0' ? ` <span style="font-size:9px;opacity:0.8">${ver}</span>` : '';
-        return `<span class="badge" style="background:rgba(245,158,11,0.15);color:var(--yellow);margin:1px">${m.tier.icon} ${m.tier.label}${verTag}</span>`;
+        return `<span class="badge" style="background:rgba(245,158,11,0.15);color:var(--yellow);margin:1px">${m.tier.icon} ${m.tier.display||m.tier.label}${verTag}</span>`;
       }).join(' ');
       plaqMData = mensais.map(m => m.tier.label).join(',');
     }
@@ -3458,7 +3458,7 @@ function openResumoAluno(email) {
         return `${monthNames[parseInt(mm)]}/${y}`;
       }).join(', ');
       return `<div style="margin:4px 0;display:flex;align-items:center;gap:8px">
-        <span class="badge" style="background:rgba(245,158,11,0.15);color:var(--yellow);font-size:13px;padding:5px 10px">${m.tier.icon} ${m.tier.label}</span>
+        <span class="badge" style="background:rgba(245,158,11,0.15);color:var(--yellow);font-size:13px;padding:5px 10px">${m.tier.icon} ${m.tier.display||m.tier.label}</span>
         <span style="color:var(--text3);font-size:11px">(${monthLabels})</span>
       </div>`;
     }).join('');
@@ -3782,16 +3782,16 @@ const PLAQ_ESTOQUE = {
   // Fat. Total (sem versionamento)
   '50K':45,'100K':81,'200K':53,'350K':19,'500K':39,'750K':24,'1M':25,'2M':13,'3M':10,'4M':10,'5M':2,'6M':3,
   // Mensal 1.0
-  '10K/mês':90,'40K/mês':0,'100K/mês':40,'200K/mês':24,'300K/mês':12,'500K/mês':5,
+  '40K/mês':90,'100K/mês':40,'200K/mês':24,'300K/mês':12,'500K/mês':5,
   // Mensal 2.0
-  '10K/mês 2.0':70,'100K/mês 2.0':15,'200K/mês 2.0':10,'300K/mês 2.0':10,'500K/mês 2.0':3,
+  '40K/mês 2.0':70,'100K/mês 2.0':15,'200K/mês 2.0':10,'300K/mês 2.0':10,'500K/mês 2.0':3,
   // Mensal 3.0
-  '10K/mês 3.0':30,'100K/mês 3.0':15
+  '40K/mês 3.0':30,'100K/mês 3.0':15
 };
 
 // Quais tiers mensal possuem versão 2.0 e 3.0
-const MENSAL_HAS_20 = new Set(['10K/mês','100K/mês','200K/mês','300K/mês','500K/mês']);
-const MENSAL_HAS_30 = new Set(['10K/mês','100K/mês']);
+const MENSAL_HAS_20 = new Set(['40K/mês','100K/mês','200K/mês','300K/mês','500K/mês']);
+const MENSAL_HAS_30 = new Set(['40K/mês','100K/mês']);
 
 function _findHistForAluno(nomeAluno) {
   const key = (nomeAluno||'').toLowerCase().trim().replace(/\s+/g,' ');
@@ -3825,12 +3825,21 @@ function _findHistForAluno(nomeAluno) {
   return bestHist;
 }
 
+// Mapeamento: 40K/mês e 10K/mês são a mesma plaquinha física (10K/semana)
+const TIER_HIST_ALIASES = { '40K/mês': '10K/mês', '10K/mês': '40K/mês' };
+
 function getPlaqVersion(tierDisplay, nomeAluno) {
   const hist = _findHistForAluno(nomeAluno);
-  if (!hist || !hist[tierDisplay]) return '1.0';
-  const priorYears = hist[tierDisplay].length;
-  if (priorYears >= 2 && MENSAL_HAS_30.has(tierDisplay)) return '3.0';
-  if (priorYears >= 1 && MENSAL_HAS_20.has(tierDisplay)) return '2.0';
+  if (!hist) return '1.0';
+  // Combinar anos do tier principal + alias (10K/mês ↔ 40K/mês)
+  let years = hist[tierDisplay] ? [...hist[tierDisplay]] : [];
+  const alias = TIER_HIST_ALIASES[tierDisplay];
+  if (alias && hist[alias]) {
+    hist[alias].forEach(y => { if (!years.includes(y)) years.push(y); });
+  }
+  if (years.length === 0) return '1.0';
+  if (years.length >= 2 && MENSAL_HAS_30.has(tierDisplay)) return '3.0';
+  if (years.length >= 1 && MENSAL_HAS_20.has(tierDisplay)) return '2.0';
   return '1.0';
 }
 
@@ -3882,12 +3891,14 @@ function renderLogistica() {
     // 2) Mensais garantidas do histórico (que não vieram dos extratos manuais)
     const hist = _findHistForAluno(nome);
     if (hist) {
-      for (const [tierKey, years] of Object.entries(hist)) {
-        if (!tierKey.includes('/mês')) continue; // só mensais
+      for (const [rawTierKey, years] of Object.entries(hist)) {
+        if (!rawTierKey.includes('/mês')) continue; // só mensais
+        // Mapear 10K/mês histórico → 40K/mês atual (mesma plaquinha física: 10K/semana)
+        const tierKey = rawTierKey === '10K/mês' ? '40K/mês' : rawTierKey;
         if (mensalAdded.has(tierKey)) continue;  // já contabilizado acima
         // Verificar se é um tier válido atual
         const tierObj = PLAQ_MENSAL_TIERS.find(t => t.label === tierKey);
-        if (!tierObj) continue; // tier não existe mais (ex: 10K/mês)
+        if (!tierObj) continue;
         const version = getPlaqVersion(tierKey, nome);
         const displayKey = version === '1.0' ? tierKey : `${tierKey} ${version}`;
 
@@ -3905,8 +3916,7 @@ function renderLogistica() {
   // Build summary table: Placa | Estoque | Demanda 2026 | Delta
   const allTiers = [
     '50K','100K','200K','350K','500K','750K','1M','2M','3M','4M','5M','6M',
-    '10K/mês','10K/mês 2.0','10K/mês 3.0',
-    '40K/mês',
+    '40K/mês','40K/mês 2.0','40K/mês 3.0',
     '100K/mês','100K/mês 2.0','100K/mês 3.0',
     '200K/mês','200K/mês 2.0',
     '300K/mês','300K/mês 2.0',
@@ -3935,7 +3945,7 @@ function renderLogistica() {
     const typeBadge = isTotal ? '<span style="color:var(--accent2);font-size:10px">Total</span>' : '<span style="color:var(--yellow);font-size:10px">Mensal</span>';
 
     summaryRows += `<tr style="background:${bgColor};border-bottom:1px solid var(--border)">
-      <td style="padding:8px 12px">${tier.replace(' 2.0','').replace(' 3.0','')} ${versionBadge}</td>
+      <td style="padding:8px 12px">${tier.replace(' 2.0','').replace(' 3.0','').replace('40K/mês','10K/semana (40K/mês)')} ${versionBadge}</td>
       <td style="padding:8px 12px;text-align:center">${typeBadge}</td>
       <td style="padding:8px 12px;text-align:right;font-variant-numeric:tabular-nums">${est}</td>
       <td style="padding:8px 12px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600">${dem}</td>
