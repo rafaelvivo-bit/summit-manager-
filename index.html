@@ -3869,12 +3869,11 @@ function renderMetas() {
   const summitEmails = new Set(STATE.summit.filter(s => s.segmento === 'Aluno').map(s => s.email?.toLowerCase()));
 
   const rows = [];
-  let atingiu = 0, superou = 0, emProgresso = 0, semDados = 0, confirmados = 0, naoConfirmados = 0;
+  let atingiu = 0, superou = 0, emProgresso = 0, semDados = 0;
 
   for (const meta of PLAQ_METAS) {
     const email = meta.e;
-    const confirmado = summitEmails.has(email);
-    if (confirmado) confirmados++; else naoConfirmados++;
+    if (!summitEmails.has(email)) continue; // só confirmados no summit
     const p = STATE.plaquinhas[email];
     const fatTotal = p ? (p.fat_total || 0) : 0;
     const plaqAtual = p ? (p.plaq_total || '—') : '—';
@@ -3899,7 +3898,7 @@ function renderMetas() {
       emProgresso++;
     }
 
-    rows.push({ nome: meta.n, email, programa: meta.p, desejada, plaqAtual, fatTotal: valorAtual, valorDesejado, delta, pct, status, statusClass, statusIcon, confirmado });
+    rows.push({ nome: meta.n, email, programa: meta.p, desejada, plaqAtual, fatTotal: valorAtual, valorDesejado, delta, pct, status, statusClass, statusIcon });
   }
 
   // Sort: em progresso first, then sem dados, then atingiu, then superou
@@ -3912,15 +3911,10 @@ function renderMetas() {
     const barWidth = Math.min(r.pct, 100);
     const barColor = r.pct >= 100 ? 'var(--green)' : (r.pct >= 60 ? 'var(--yellow)' : 'var(--red)');
 
-    const confBadge = r.confirmado
-      ? '<span style="color:var(--green);font-size:11px">✅ Sim</span>'
-      : '<span style="color:var(--red);font-size:11px">❌ Não</span>';
-
-    return `<tr style="border-bottom:1px solid var(--border)" data-status="${r.status}" data-programa="${r.programa}" data-confirmado="${r.confirmado?'sim':'nao'}">
+    return `<tr style="border-bottom:1px solid var(--border)" data-status="${r.status}" data-programa="${r.programa}">
       <td style="padding:8px 10px;font-size:12px;color:var(--text3)">${i+1}</td>
       <td style="padding:8px 10px;font-size:13px;font-weight:500">${r.nome}</td>
       <td style="padding:8px 10px;font-size:11px;color:var(--text3)">${r.programa}</td>
-      <td style="padding:8px 10px;text-align:center">${confBadge}</td>
       <td style="padding:8px 10px;text-align:center"><span class="badge" style="background:rgba(99,102,241,0.15);color:var(--accent2);font-size:12px">${r.desejada}</span></td>
       <td style="padding:8px 10px;text-align:center"><span class="badge" style="background:${r.plaqAtual==='—'?'rgba(255,255,255,0.05)':'rgba(34,197,94,0.15)'};color:${r.plaqAtual==='—'?'var(--text3)':'var(--green)'};font-size:12px">${r.plaqAtual}</span></td>
       <td style="padding:8px 10px;text-align:right;font-variant-numeric:tabular-nums;font-size:12px">${r.fatTotal > 0 ? fmt(r.fatTotal) : '—'}</td>
@@ -3955,15 +3949,10 @@ function renderMetas() {
         <div class="label">Sem Comprovante</div>
         <div class="sub">Aguardando validação</div>
       </div>
-      <div class="dash-card accent2">
-        <div class="number">${confirmados}</div>
-        <div class="label">Confirmados</div>
-        <div class="sub">Inscritos no Summit</div>
-      </div>
       <div class="dash-card purple">
-        <div class="number">${naoConfirmados}</div>
-        <div class="label">Não Confirmados</div>
-        <div class="sub">Sem inscrição</div>
+        <div class="number">${total}</div>
+        <div class="label">Total Metas</div>
+        <div class="sub">Confirmados no Summit</div>
       </div>
     </div>
 
@@ -3982,11 +3971,6 @@ function renderMetas() {
         <option value="Chronos">Chronos</option>
         <option value="Chronos Journey">Chronos Journey</option>
       </select>
-      <select onchange="filterMetas()" id="metaConfFilter" style="background:var(--card);color:var(--text);border:1px solid var(--border);padding:6px 10px;border-radius:6px;font-size:12px">
-        <option value="todos">Todos (confirmação)</option>
-        <option value="sim">✅ Confirmados</option>
-        <option value="nao">❌ Não confirmados</option>
-      </select>
     </div>
 
     <div class="table-wrap" style="max-height:600px;overflow-y:auto">
@@ -3995,7 +3979,6 @@ function renderMetas() {
           <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text3);width:30px">#</th>
           <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text3)">Aluno</th>
           <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text3)">Programa</th>
-          <th style="padding:8px 10px;text-align:center;font-size:10px;color:var(--text3)">Confirmado</th>
           <th style="padding:8px 10px;text-align:center;font-size:10px;color:var(--text3)">Meta</th>
           <th style="padding:8px 10px;text-align:center;font-size:10px;color:var(--text3)">Comprovado</th>
           <th style="padding:8px 10px;text-align:right;font-size:10px;color:var(--text3)">Fat. Total</th>
@@ -4013,12 +3996,10 @@ function renderMetas() {
 function filterMetas() {
   const status = document.getElementById('metaStatusFilter').value;
   const prog = document.getElementById('metaProgFilter').value;
-  const conf = document.getElementById('metaConfFilter').value;
   document.querySelectorAll('#metasTableBody tr').forEach(tr => {
     const matchStatus = status === 'todos' || tr.dataset.status === status;
     const matchProg = prog === 'todos' || tr.dataset.programa === prog;
-    const matchConf = conf === 'todos' || tr.dataset.confirmado === conf;
-    tr.style.display = (matchStatus && matchProg && matchConf) ? '' : 'none';
+    tr.style.display = (matchStatus && matchProg) ? '' : 'none';
   });
 }
 
