@@ -342,18 +342,21 @@ function setupFirebaseListeners() {
   db.ref('raw').on('value', snap => {
     const data = snap.val();
     if (!data) return;
-    if (Date.now() - lastRawSaveTime < 5000) return;
-    isSyncingFromFirebase = true;
-    RAW = {
-      bc_summit: data.bc_summit || [],
-      sympla_summit: data.sympla_summit || [],
-      bc_mansao: data.bc_mansao || [],
-      sympla_mansao: data.sympla_mansao || [],
-      alunos: data.alunos || [],
-      comprovantes: data.comprovantes || []
+    const elapsed = Date.now() - lastRawSaveTime;
+    if (elapsed < 5000) { console.log(`[Firebase RAW listener] Ignorando — ${elapsed}ms desde último save`); return; }
+    // Preserve local RAW arrays that are larger than Firebase (prevents sync regression)
+    const mergedRaw = {
+      bc_summit: (data.bc_summit || []).length >= (RAW.bc_summit || []).length ? (data.bc_summit || []) : RAW.bc_summit,
+      sympla_summit: (data.sympla_summit || []).length >= (RAW.sympla_summit || []).length ? (data.sympla_summit || []) : RAW.sympla_summit,
+      bc_mansao: (data.bc_mansao || []).length >= (RAW.bc_mansao || []).length ? (data.bc_mansao || []) : RAW.bc_mansao,
+      sympla_mansao: (data.sympla_mansao || []).length >= (RAW.sympla_mansao || []).length ? (data.sympla_mansao || []) : RAW.sympla_mansao,
+      alunos: (data.alunos || []).length >= (RAW.alunos || []).length ? (data.alunos || []) : RAW.alunos,
+      comprovantes: (data.comprovantes || []).length >= (RAW.comprovantes || []).length ? (data.comprovantes || []) : RAW.comprovantes,
     };
+    isSyncingFromFirebase = true;
+    RAW = mergedRaw;
     try { localStorage.setItem('summit_nsf_raw', JSON.stringify(RAW)); } catch(e) {}
-    console.log('RAW sincronizado do Firebase');
+    console.log('RAW sincronizado do Firebase:', Object.entries(RAW).map(([k,v])=>`${k}:${v.length}`).join(', '));
     const hasAnySummit = RAW.bc_summit.length > 0 || RAW.sympla_summit.length > 0;
     const hasAnyMansao = RAW.bc_mansao.length > 0 || RAW.sympla_mansao.length > 0;
     if (hasAnySummit) rebuildSummit();
@@ -656,8 +659,8 @@ function handleUpload(input, type) {
 }
 
 function parseCSV(text, delim=',') {
-  // Strip BOM and normalize line endings
-  text = text.replace(/^\xEF\xBB\xBF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  // Strip BOM (UTF-8 BOM decoded to U+FEFF in JS strings) and normalize line endings
+  text = text.replace(/^﻿/, '').replace(/^\xEF\xBB\xBF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   if (!text.trim()) return [];
 
   // Detect delimiter from first line
@@ -731,7 +734,7 @@ let RAW = { bc_summit:[], sympla_summit:[], bc_mansao:[], sympla_mansao:[], alun
 function parseSymplaCSV(text) {
   // Sympla CSV: BOM + 7 header lines (event name, date, venue, blanks) + real headers + data
   // Delimiter: semicolon (;)
-  text = text.replace(/^\xEF\xBB\xBF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  text = text.replace(/^﻿/, '').replace(/^\xEF\xBB\xBF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   const lines = text.split('\n');
 
   // Find the real header row: contains both "Ordem" and "Email"
@@ -869,6 +872,9 @@ function processBCMansao(text) {
   RAW.bc_mansao = parseCSV(text);
   toast(`BC Mansão carregado: ${RAW.bc_mansao.length} linhas`);
   saveRaw();
+  // Rebuild summit first (to update has_mansao flags from new BC Mansão)
+  const hasAnySummit = RAW.bc_summit.length > 0 || RAW.sympla_summit.length > 0;
+  if (hasAnySummit) rebuildSummit();
   rebuildMansao();
 }
 
@@ -2540,11 +2546,13 @@ function rebuildSummit() {
 }
 
 function rebuildMansao() {
+  console.log(`[rebuildMansao] RAW.bc_mansao: ${RAW.bc_mansao.length}, RAW.sympla_mansao: ${RAW.sympla_mansao.length}`);
   const bcByEmail = {};
   RAW.bc_mansao.forEach(r => {
     const e = ne(getField(r, 'Email', 'email', 'E-mail'));
     if (e) bcByEmail[e] = r;
   });
+  console.log(`[rebuildMansao] bcByEmail: ${Object.keys(bcByEmail).length}`);
 
   const symplaByEmail = {};
   RAW.sympla_mansao.forEach(r => {
@@ -2558,6 +2566,7 @@ function rebuildMansao() {
     if (!symplaByEmail[e]) symplaByEmail[e] = [];
     symplaByEmail[e].push({ nome, tipo, tel });
   });
+  console.log(`[rebuildMansao] symplaByEmail (Aprovado): ${Object.keys(symplaByEmail).length}`);
 
   const allEmails = new Set([...Object.keys(bcByEmail), ...Object.keys(symplaByEmail)]);
   const pessoas = [];
@@ -2588,6 +2597,7 @@ function rebuildMansao() {
     });
   });
 
+  console.log(`[rebuildMansao] Total pessoas: ${pessoas.length}`);
   STATE.mansao = pessoas;
   saveState();
   renderAll();
@@ -2606,6 +2616,7 @@ function renderAll() {
 function renderDashboard() {
   const s = STATE.summit;
   const m = STATE.mansao;
+  console.log(`[renderDashboard] STATE.summit: ${s.length}, STATE.mansao: ${m.length}`);
   const total = s.length;
   const alunos = s.filter(p=>p.segmento==='Aluno').length;
   const externos = s.filter(p=>p.segmento==='Externo').length;
