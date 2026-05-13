@@ -169,7 +169,7 @@ tr.row-outro td { color:#34d399; }
 <!-- APP -->
 <div class="app" id="app">
   <div class="topbar">
-    <h1>Summit <span>NSF 2026</span> <span style="font-size:12px;color:#ff6;font-weight:700">v13</span></h1>
+    <h1>Summit <span>NSF 2026</span> <span style="font-size:12px;color:#ff6;font-weight:700">v14</span></h1>
     <div class="topbar-actions">
       <label title="Upload BC Summit (.csv)">
         📋 BC Summit
@@ -872,10 +872,26 @@ function processBCMansao(text) {
   RAW.bc_mansao = parseCSV(text);
   toast(`BC Mansão carregado: ${RAW.bc_mansao.length} linhas`);
   saveRaw();
-  // Rebuild summit first (to update has_mansao flags from new BC Mansão)
-  const hasAnySummit = RAW.bc_summit.length > 0 || RAW.sympla_summit.length > 0;
-  if (hasAnySummit) rebuildSummit();
+  // Update has_mansao flags in summit without full rebuild
+  updateMansaoFlags();
   rebuildMansao();
+}
+
+function updateMansaoFlags() {
+  // Lightweight update of has_mansao in STATE.summit from RAW.bc_mansao + RAW.bc_summit
+  const mansaoEmails = new Set();
+  RAW.bc_mansao.forEach(r => {
+    const e = ne(getField(r, 'Email', 'email', 'E-mail'));
+    const mansao = getField(r, 'Mansão');
+    if (e && mansao === 'Sim') mansaoEmails.add(e);
+  });
+  RAW.bc_summit.forEach(r => {
+    const e = ne(getField(r, 'Email', 'email', 'E-mail'));
+    const mansao = getField(r, 'Mansão');
+    if (e && mansao === 'Sim') mansaoEmails.add(e);
+  });
+  STATE.summit.forEach(p => { p.has_mansao = mansaoEmails.has(p.email); });
+  console.log(`[updateMansaoFlags] ${mansaoEmails.size} emails com mansão`);
 }
 
 function processSymplaMansao(rows) {
@@ -2599,6 +2615,7 @@ function rebuildMansao() {
 
   console.log(`[rebuildMansao] Total pessoas: ${pessoas.length}`);
   STATE.mansao = pessoas;
+  toast(`🏠 Mansão rebuild: ${pessoas.length} pessoas (BC:${Object.keys(bcByEmail).length} Sympla:${Object.keys(symplaByEmail).length})`);
   saveState();
   renderAll();
 }
