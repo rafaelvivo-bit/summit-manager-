@@ -169,7 +169,7 @@ tr.row-outro td { color:#34d399; }
 <!-- APP -->
 <div class="app" id="app">
   <div class="topbar">
-    <h1>Summit <span>NSF 2026</span> <span style="font-size:12px;color:#ff6;font-weight:700">v14</span></h1>
+    <h1>Summit <span>NSF 2026</span> <span style="font-size:12px;color:#ff6;font-weight:700">v15</span></h1>
     <div class="topbar-actions">
       <label title="Upload BC Summit (.csv)">
         📋 BC Summit
@@ -253,7 +253,8 @@ let lastRawSaveTime = 0;
 let STATE = {
   summit: [],    // pessoas summit
   mansao: [],    // pessoas mansão
-  plaquinhas: {} // email -> { comprovante: bool, tipo: string }
+  plaquinhas: {}, // email -> { comprovante: bool, tipo: string }
+  alunos_manuais: [] // alunos adicionados manualmente na aba plaquinhas
 };
 
 // Firebase key sanitization: dots/special chars are illegal in Firebase keys
@@ -469,6 +470,7 @@ async function initData() {
       STATE = stateData;
       STATE.summit = STATE.summit || [];
       STATE.mansao = STATE.mansao || [];
+      STATE.alunos_manuais = STATE.alunos_manuais || [];
       // Decode Firebase keys (email%2Ecom → email.com)
       STATE.plaquinhas = decodeFirebasePlaquinhas(STATE.plaquinhas || {});
 
@@ -2959,7 +2961,14 @@ function renderMansaoTable() {
 
 // ========== RENDER PLAQUINHAS ==========
 function renderPlaquinhas() {
-  const alunos = STATE.summit.filter(p => p.segmento === 'Aluno').sort((a,b) => a.nome.localeCompare(b.nome,'pt'));
+  const summitAlunos = STATE.summit.filter(p => p.segmento === 'Aluno');
+  const summitEmails = new Set(summitAlunos.map(a => a.email));
+  // Merge manual alunos (only those not already in summit)
+  const manuais = (STATE.alunos_manuais || []).filter(m => !summitEmails.has(m.email)).map(m => ({
+    email: m.email, nome: m.nome, programa: m.programa || '', telefone: m.telefone || '',
+    segmento: 'Aluno', tierMax: 'N/D', _manual: true
+  }));
+  const alunos = [...summitAlunos, ...manuais].sort((a,b) => a.nome.localeCompare(b.nome,'pt'));
 
   // Stats — APENAS validações manuais (garantido não conta nos KPIs)
   const comManual = alunos.filter(a => STATE.plaquinhas[a.email]?.extratos?.some(e => e.banco === 'Manual')).length;
@@ -3072,6 +3081,7 @@ function renderPlaquinhas() {
         ${PLAQ_MENSAL_TIERS.map(t => `<option value="${t.label}">${t.icon} ${t.label}</option>`).join('')}
         <option value="—">Sem plaquinha</option>
       </select>
+      <button onclick="showAddAlunoModal()" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:13px;font-weight:600">+ Adicionar Aluno</button>
       <span class="count" id="count-plaq">${alunos.length} alunos</span>
     </div>
     <div class="table-wrap">
@@ -3136,7 +3146,7 @@ function renderPlaquinhas() {
 
     html += `<tr data-status="${hasExtrato ? 'com-extrato' : 'sem-extrato'}" data-origin="${origin}" data-ptotal="${plaqT}" data-pmensal="${plaqMData}" style="${rowBg}">
       <td>${i+1}</td>
-      <td>${a.nome}</td>
+      <td>${a.nome}${a._manual ? ' <span style="font-size:9px;background:rgba(245,158,11,0.2);color:var(--yellow);padding:1px 5px;border-radius:3px">manual</span>' : ''}</td>
       <td style="font-size:11px">${a.email}</td>
       <td>${extratosHtml}</td>
       <td style="text-align:right;font-variant-numeric:tabular-nums" title="${hasGarantido ? 'Garantido: '+fmtFull(p.fat_garantido)+' + Manual: '+fmtFull(p.fat_manual||0) : ''}">${fatTotal > 0 ? fmtFull(fatTotal) + (hasGarantido ? ' 🏅' : '') : '—'}</td>
@@ -3156,6 +3166,7 @@ function renderPlaquinhas() {
         ${hasExtrato ? `<button onclick="openResumoAluno('${a.email}')" style="padding:4px 10px;background:var(--accent2);color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;margin-right:4px">📊 Resumo</button>` : ''}
         <button onclick="openPDFUploadForAluno('${a.email}')" style="padding:4px 10px;background:var(--accent);color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer">📄 Anexar</button>
         <button onclick="openManualValidation('${a.email}')" style="padding:4px 10px;background:rgba(34,197,94,0.2);color:var(--green);border:1px solid rgba(34,197,94,0.3);border-radius:4px;font-size:11px;cursor:pointer">✍️ Manual</button>
+        ${a._manual ? `<button onclick="removeAlunoManual('${a.email}')" style="padding:4px 8px;background:rgba(239,68,68,0.15);color:var(--red);border:1px solid rgba(239,68,68,0.3);border-radius:4px;font-size:11px;cursor:pointer" title="Remover aluno manual">🗑</button>` : ''}
       </td>
     </tr>`;
   });
@@ -3164,8 +3175,89 @@ function renderPlaquinhas() {
   document.getElementById('panel-plaquinhas').innerHTML = html;
 }
 
+// ========== ALUNO MANUAL ==========
+function showAddAlunoModal() {
+  const programas = ['Orion', 'Atlas', 'Chronos', 'Chronos Journey'];
+  const modalHtml = `
+    <div class="modal-overlay" onclick="if(event.target===this)this.remove()">
+      <div class="modal-content" style="max-width:420px">
+        <h3 style="margin:0 0 16px">Adicionar Aluno Manual</h3>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <input type="text" id="add-aluno-nome" placeholder="Nome completo *" style="padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text1);font-size:14px">
+          <input type="email" id="add-aluno-email" placeholder="E-mail *" style="padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text1);font-size:14px">
+          <select id="add-aluno-programa" style="padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text1);font-size:14px">
+            <option value="">Programa (opcional)</option>
+            ${programas.map(p => `<option value="${p}">${p}</option>`).join('')}
+          </select>
+          <input type="text" id="add-aluno-telefone" placeholder="Telefone (opcional)" style="padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text1);font-size:14px">
+          <div id="add-aluno-error" style="color:var(--red);font-size:12px;display:none"></div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+            <button onclick="this.closest('.modal-overlay').remove()" style="padding:8px 16px;background:var(--bg3);color:var(--text2);border:none;border-radius:6px;cursor:pointer">Cancelar</button>
+            <button onclick="addAlunoManual()" style="padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600">Adicionar</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+  document.getElementById('add-aluno-nome').focus();
+}
+
+function addAlunoManual() {
+  const nome = document.getElementById('add-aluno-nome').value.trim();
+  const email = document.getElementById('add-aluno-email').value.trim().toLowerCase();
+  const programa = document.getElementById('add-aluno-programa').value;
+  const telefone = document.getElementById('add-aluno-telefone').value.trim();
+  const errDiv = document.getElementById('add-aluno-error');
+
+  if (!nome || !email) {
+    errDiv.textContent = 'Nome e e-mail são obrigatórios.';
+    errDiv.style.display = 'block';
+    return;
+  }
+  if (!email.includes('@')) {
+    errDiv.textContent = 'E-mail inválido.';
+    errDiv.style.display = 'block';
+    return;
+  }
+
+  // Check if already exists
+  const existsSummit = STATE.summit.some(p => p.email === email);
+  const existsManual = (STATE.alunos_manuais || []).some(m => m.email === email);
+  if (existsSummit) {
+    errDiv.textContent = 'Este aluno já existe na lista do Summit.';
+    errDiv.style.display = 'block';
+    return;
+  }
+  if (existsManual) {
+    errDiv.textContent = 'Este aluno já foi adicionado manualmente.';
+    errDiv.style.display = 'block';
+    return;
+  }
+
+  if (!STATE.alunos_manuais) STATE.alunos_manuais = [];
+  STATE.alunos_manuais.push({ nome, email, programa, telefone, added: Date.now() });
+
+  // Initialize plaquinhas entry
+  if (!STATE.plaquinhas[email]) {
+    STATE.plaquinhas[email] = { nome, extratos: [] };
+  }
+
+  saveState();
+  document.querySelector('.modal-overlay').remove();
+  toast(`Aluno "${nome}" adicionado com sucesso`);
+  renderPlaquinhas();
+}
+
+function removeAlunoManual(email) {
+  if (!confirm('Remover este aluno manual?')) return;
+  STATE.alunos_manuais = (STATE.alunos_manuais || []).filter(m => m.email !== email);
+  saveState();
+  toast('Aluno manual removido');
+  renderPlaquinhas();
+}
+
 function openManualValidation(email) {
-  const aluno = STATE.summit.find(p => p.email === email);
+  const aluno = STATE.summit.find(p => p.email === email) || (STATE.alunos_manuais || []).find(m => m.email === email);
   const nome = aluno ? aluno.nome : email;
   const plaq = STATE.plaquinhas[email];
   const existingManual = plaq?.extratos?.find(e => e.banco === 'Manual');
