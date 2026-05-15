@@ -2991,7 +2991,11 @@ function renderPlaquinhas() {
 
   alunos.forEach(a => {
     const p = STATE.plaquinhas[a.email];
-    if (!p || !p.extratos?.some(e => e.banco === 'Manual')) return;
+    if (!p) return;
+    const hasManual = p.extratos?.some(e => e.banco === 'Manual');
+    const hasGarantido = p.fat_garantido > 0;
+    const hasHistMensal = !!_findHistForAluno(p.nome || a.nome);
+    if (!hasManual && !hasGarantido && !hasHistMensal) return;
     if (p.plaq_total && p.plaq_total !== '—') totalTierCount[p.plaq_total] = (totalTierCount[p.plaq_total]||0) + 1;
     if (p.plaq_mensais && p.plaq_mensais.length > 0) {
       p.plaq_mensais.forEach(m => {
