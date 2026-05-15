@@ -362,6 +362,7 @@ function setupFirebaseListeners() {
     const hasAnyMansao = RAW.bc_mansao.length > 0 || RAW.sympla_mansao.length > 0;
     if (hasAnySummit) rebuildSummit();
     if (hasAnyMansao) rebuildMansao();
+    if (hasAnySummit) recalcAllPlaquinhas();
     isSyncingFromFirebase = false;
   });
 
@@ -488,6 +489,12 @@ async function initData() {
               if (localExtratos > fbExtratos) {
                 STATE.plaquinhas[email] = localPlaq;
                 console.log(`Plaquinha ${email}: localStorage tem ${localExtratos} extratos vs Firebase ${fbExtratos} — usando local`);
+              } else if (fbPlaq) {
+                // Always preserve local overrides even if Firebase has same/more extratos
+                if (localPlaq.plaq_total_override && !fbPlaq.plaq_total_override) {
+                  fbPlaq.plaq_total_override = localPlaq.plaq_total_override;
+                  console.log(`Plaquinha ${email}: preservando plaq_total_override local: ${localPlaq.plaq_total_override}`);
+                }
               }
             }
           }
