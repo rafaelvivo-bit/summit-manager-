@@ -2389,11 +2389,23 @@ function getGuaranteedFatTotal(nomeAluno) {
     if (norm(to) === key) maxVal = Math.max(maxVal, _getMaxTotalFromHist(PLAQ_HISTORY[from]));
   }
 
-  // 3) Substring match com validação de primeiro nome
+  // 3) Substring match OU match por palavras com validação de primeiro nome
   for (const [hName, hist] of Object.entries(PLAQ_HISTORY)) {
     const hNorm = norm(hName);
     if (hNorm === key) continue;
-    if ((key.includes(hNorm) || hNorm.includes(key)) && key.split(' ')[0] === hNorm.split(' ')[0]) {
+    const firstMatch = key.split(' ')[0] === hNorm.split(' ')[0];
+    if (!firstMatch) continue;
+    // Substring contígua
+    if (key.includes(hNorm) || hNorm.includes(key)) {
+      maxVal = Math.max(maxVal, _getMaxTotalFromHist(hist));
+      continue;
+    }
+    // Match por palavras: todas as palavras do menor devem estar no maior
+    const keyWords = key.split(' ');
+    const hWords = hNorm.split(' ');
+    const shorter = keyWords.length <= hWords.length ? keyWords : hWords;
+    const longer = keyWords.length <= hWords.length ? hWords : keyWords;
+    if (shorter.length >= 2 && shorter.every(w => longer.includes(w))) {
       maxVal = Math.max(maxVal, _getMaxTotalFromHist(hist));
     }
   }
@@ -4025,13 +4037,27 @@ function _findHistForAluno(nomeAluno) {
     if (norm(to) === key && PLAQ_HISTORY[from]) return PLAQ_HISTORY[from];
   }
 
-  // Substring com merge de todos os matches
+  // Substring match OU match por palavras (todas as palavras do menor presentes no maior)
   let bestHist = null;
   let bestTotal = 0;
   for (const [hName, hist] of Object.entries(PLAQ_HISTORY)) {
     const hNorm = norm(hName);
     if (hNorm === key) continue;
-    if ((key.includes(hNorm) || hNorm.includes(key)) && key.split(' ')[0] === hNorm.split(' ')[0]) {
+    const firstMatch = key.split(' ')[0] === hNorm.split(' ')[0];
+    if (!firstMatch) continue;
+    // Substring contígua
+    if (key.includes(hNorm) || hNorm.includes(key)) {
+      const total = Object.keys(hist).filter(t => !t.includes('/mês')).length;
+      if (!bestHist || total > bestTotal) { bestHist = hist; bestTotal = total; }
+      continue;
+    }
+    // Match por palavras: todas as palavras do nome menor devem estar no maior
+    const keyWords = key.split(' ');
+    const hWords = hNorm.split(' ');
+    const shorter = keyWords.length <= hWords.length ? keyWords : hWords;
+    const longer = keyWords.length <= hWords.length ? hWords : keyWords;
+    const allPresent = shorter.every(w => longer.includes(w));
+    if (allPresent && shorter.length >= 2) {
       const total = Object.keys(hist).filter(t => !t.includes('/mês')).length;
       if (!bestHist || total > bestTotal) { bestHist = hist; bestTotal = total; }
     }
