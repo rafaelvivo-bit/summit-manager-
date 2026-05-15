@@ -2430,7 +2430,9 @@ function recalcAlunoPlaquinhas(email) {
   plaq.fat_total = Math.max(garantido, fatHistorico) + fatNovo;
 
   const ptier = classifyPlaquinhaTotal(plaq.fat_total);
-  plaq.plaq_total = ptier ? ptier.label : (garantido > 0 ? classifyPlaquinhaTotal(garantido)?.label || '—' : '—');
+  const autoTotal = ptier ? ptier.label : (garantido > 0 ? classifyPlaquinhaTotal(garantido)?.label || '—' : '—');
+  // Override manual tem prioridade
+  plaq.plaq_total = plaq.plaq_total_override || autoTotal;
 
   const mensaisAcumulo = classifyPlaquinhasMensaisAcumulo(mesesConsolidado);
   plaq.plaq_mensais = mensaisAcumulo;
@@ -3134,7 +3136,9 @@ function renderPlaquinhas() {
     const plaqT = p.plaq_total || '—';
 
     const ptier = PLAQ_TOTAL_TIERS.find(t => t.label === plaqT);
-    const plaqTHtml = ptier ? `<span class="badge" style="background:rgba(99,102,241,0.15);color:var(--accent2)">${ptier.icon} ${ptier.label}</span>` : '<span style="color:var(--text3)">—</span>';
+    const isOverride = !!p.plaq_total_override;
+    const overrideTag = isOverride ? ' <span style="font-size:8px;background:rgba(245,158,11,0.25);color:var(--yellow);padding:1px 4px;border-radius:3px;vertical-align:middle" title="Plaquinha definida manualmente">✏️ manual</span>' : '';
+    const plaqTHtml = ptier ? `<span class="badge" style="background:rgba(99,102,241,0.15);color:var(--accent2)">${ptier.icon} ${ptier.label}</span>${overrideTag}` : '<span style="color:var(--text3)">—</span>';
 
     const mensais = p.plaq_mensais || [];
     let plaqMHtml = '<span style="color:var(--text3)">—</span>';
@@ -3157,7 +3161,7 @@ function renderPlaquinhas() {
       <td style="font-size:11px">${a.email}</td>
       <td>${extratosHtml}</td>
       <td style="text-align:right;font-variant-numeric:tabular-nums" title="${hasGarantido ? 'Garantido: '+fmtFull(p.fat_garantido)+' + Manual: '+fmtFull(p.fat_manual||0) : ''}">${fatTotal > 0 ? fmtFull(fatTotal) + (hasGarantido ? ' 🏅' : '') : '—'}</td>
-      <td style="text-align:center">${hasGarantido ? `<span class="badge" style="background:rgba(99,102,241,0.2);color:#a78bfa;border:1px solid rgba(99,102,241,0.3)">${ptier ? ptier.icon+' ' : ''}${plaqT} 🏅</span>` : plaqTHtml}</td>
+      <td style="text-align:center;cursor:pointer" onclick="showPlaqTotalOverride('${a.email}', this)" title="Clique para editar plaquinha total">${hasGarantido && !isOverride ? `<span class="badge" style="background:rgba(99,102,241,0.2);color:#a78bfa;border:1px solid rgba(99,102,241,0.3)">${ptier ? ptier.icon+' ' : ''}${plaqT} 🏅</span>` : plaqTHtml} <span style="font-size:9px;opacity:0.4;vertical-align:middle">✎</span></td>
       <td style="text-align:right;font-variant-numeric:tabular-nums">${fatMes > 0 ? fmtFull(fatMes) : '—'}</td>
       <td style="text-align:center">${plaqMHtml}</td>
       <td style="font-size:10px;max-width:220px">${(() => {
@@ -3261,6 +3265,73 @@ function removeAlunoManual(email) {
   saveState();
   toast('Aluno manual removido');
   renderPlaquinhas();
+}
+
+function showPlaqTotalOverride(email, btnEl) {
+  const p = STATE.plaquinhas[email];
+  if (!p) { toast('Aluno sem dados de plaquinha'); return; }
+  const current = p.plaq_total || '—';
+  const isOverride = !!p.plaq_total_override;
+
+  // Create dropdown inline
+  const existing = document.getElementById('plaq-override-dd');
+  if (existing) existing.remove();
+
+  const dd = document.createElement('div');
+  dd.id = 'plaq-override-dd';
+  dd.style.cssText = 'position:fixed;z-index:9999;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:6px 0;box-shadow:0 8px 24px rgba(0,0,0,0.4);max-height:340px;overflow-y:auto;min-width:160px';
+
+  const rect = btnEl.getBoundingClientRect();
+  dd.style.top = (rect.bottom + 4) + 'px';
+  dd.style.left = rect.left + 'px';
+
+  // Option to remove override
+  if (isOverride) {
+    const opt = document.createElement('div');
+    opt.style.cssText = 'padding:6px 14px;cursor:pointer;font-size:12px;color:var(--red);border-bottom:1px solid var(--border)';
+    opt.textContent = '✕ Remover override (usar automático)';
+    opt.onmouseenter = () => opt.style.background = 'rgba(239,68,68,0.1)';
+    opt.onmouseleave = () => opt.style.background = '';
+    opt.onclick = () => {
+      delete p.plaq_total_override;
+      rebuildPlaquinhas();
+      saveState();
+      renderPlaquinhas();
+      dd.remove();
+      toast('Override removido — usando cálculo automático');
+    };
+    dd.appendChild(opt);
+  }
+
+  PLAQ_TOTAL_TIERS.slice().reverse().forEach(tier => {
+    const opt = document.createElement('div');
+    const isCurrent = tier.label === current;
+    opt.style.cssText = `padding:6px 14px;cursor:pointer;font-size:12px;color:var(--text1);${isCurrent ? 'background:rgba(99,102,241,0.15);font-weight:600' : ''}`;
+    opt.innerHTML = `${tier.icon} ${tier.label}${isCurrent ? ' ✓' : ''}`;
+    opt.onmouseenter = () => { if (!isCurrent) opt.style.background = 'rgba(99,102,241,0.08)'; };
+    opt.onmouseleave = () => { if (!isCurrent) opt.style.background = ''; };
+    opt.onclick = () => {
+      if (tier.label === current && !isOverride) { dd.remove(); return; }
+      p.plaq_total_override = tier.label;
+      p.plaq_total = tier.label;
+      saveState();
+      renderPlaquinhas();
+      dd.remove();
+      toast(`Plaquinha total de ${p.nome || email} alterada para ${tier.label} (manual)`);
+    };
+    dd.appendChild(opt);
+  });
+
+  document.body.appendChild(dd);
+
+  // Close on click outside
+  const closeHandler = (e) => {
+    if (!dd.contains(e.target) && e.target !== btnEl) {
+      dd.remove();
+      document.removeEventListener('click', closeHandler);
+    }
+  };
+  setTimeout(() => document.addEventListener('click', closeHandler), 10);
 }
 
 function openManualValidation(email) {
