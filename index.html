@@ -2541,44 +2541,77 @@ function rebuildSummit() {
 
   const ORDER = { Premium:3, Black:2, Silver:1, 'N/D':0 };
 
+  // Helper: check if two names are genuinely different people (not typo variants)
+  function isDifferentPerson(a, b) {
+    const na = a.toLowerCase().trim().replace(/\s+/g,' ');
+    const nb = b.toLowerCase().trim().replace(/\s+/g,' ');
+    if (na === nb) return false;
+    // One contains the other = same person (e.g. "Aryel Mairinques" vs "Aryel Mairinques Miranda")
+    if (na.includes(nb) || nb.includes(na)) return false;
+    // Same first name = likely variant unless last name is totally different
+    const wa = na.split(' '), wb = nb.split(' ');
+    if (wa[0] === wb[0] && wa.length >= 2 && wb.length >= 2) {
+      // Check if last names share any word
+      const setA = new Set(wa.slice(1)), setB = new Set(wb.slice(1));
+      for (const w of setA) { if (setB.has(w)) return false; }
+    }
+    return true;
+  }
+
   allEmails.forEach(e => {
     const sy = symplaByEmail[e] || [];
     const bc = bcByEmail[e] || null;
     const al = alunosByEmail[e] || null;
-
-    const nome = sy.length ? sy[0].nome : (bc ? getField(bc, 'Aluno', 'Nome') : '');
-    const tel = sy.length ? sy[0].tel : (bc ? getField(bc, 'Telefone') : '');
-    const programa = (al ? getField(al, 'Programa') : (bc ? getField(bc, 'Programa') : '')) || '';
-    const estrategista = (al ? getField(al, 'Estrategista') : (bc ? getField(bc, 'Estrategista') : '')) || '';
-
-    let tierMax = 'N/D';
-    sy.forEach(s => { if ((ORDER[s.tier]||0) > (ORDER[tierMax]||0)) tierMax = s.tier; });
-
-    const cats = [...new Set(sy.map(s=>s.cat))].join(', ');
-    const isAtivo = !!bc;
-    const todasExt = sy.length > 0 && sy.every(s => s.cat==='Venda Paga Externa' || s.cat==='Cortesia Externa');
-    const isAluno = !!al;
-    const isExterno = todasExt && !isAluno;
-
-    const ingressoErrado = (isAluno && !isAtivo && sy.length > 0) ? 'Errado' : 'OK';
-
-    let segmento = 'Convidado/Outro';
-    if (isAtivo || isAluno) segmento = 'Aluno';
-    else if (isExterno) segmento = 'Externo';
-
-    let origem = '—';
-    if (bc && sy.length) origem = 'BC + Sympla';
-    else if (bc) origem = 'Só BC';
-    else if (sy.length) origem = 'Só Sympla';
-
     const has_mansao = mansaoEmails.has(e);
 
-    pessoas.push({
-      email: e, nome, telefone: tel, programa, estrategista,
-      segmento, tierMax, categorias: cats, origem, ingressoErrado,
-      no_bc: !!bc, no_sympla: sy.length > 0,
-      qtd_sympla: sy.length, is_chronos: programa.toLowerCase().includes('chronos'),
-      has_mansao
+    // Group Sympla tickets by distinct person
+    const personGroups = [];
+    sy.forEach(s => {
+      const existing = personGroups.find(g => !isDifferentPerson(g[0].nome, s.nome));
+      if (existing) existing.push(s);
+      else personGroups.push([s]);
+    });
+
+    // If no Sympla tickets, still process BC-only
+    if (personGroups.length === 0) personGroups.push([]);
+
+    personGroups.forEach((group, gi) => {
+      const isMainEntry = gi === 0; // first group gets BC data
+      const currentBc = isMainEntry ? bc : null;
+      const currentAl = isMainEntry ? al : null;
+
+      const nome = group.length ? group[0].nome : (currentBc ? getField(currentBc, 'Aluno', 'Nome') : '');
+      const tel = group.length ? group[0].tel : (currentBc ? getField(currentBc, 'Telefone') : '');
+      const programa = (currentAl ? getField(currentAl, 'Programa') : (currentBc ? getField(currentBc, 'Programa') : '')) || '';
+      const estrategista = (currentAl ? getField(currentAl, 'Estrategista') : (currentBc ? getField(currentBc, 'Estrategista') : '')) || '';
+
+      let tierMax = 'N/D';
+      group.forEach(s => { if ((ORDER[s.tier]||0) > (ORDER[tierMax]||0)) tierMax = s.tier; });
+
+      const cats = [...new Set(group.map(s=>s.cat))].join(', ');
+      const isAtivo = !!currentBc;
+      const todasExt = group.length > 0 && group.every(s => s.cat==='Venda Paga Externa' || s.cat==='Cortesia Externa');
+      const isAluno = !!currentAl;
+      const isExterno = todasExt && !isAluno;
+
+      const ingressoErrado = (isAluno && !isAtivo && group.length > 0) ? 'Errado' : 'OK';
+
+      let segmento = 'Convidado/Outro';
+      if (isAtivo || isAluno) segmento = 'Aluno';
+      else if (isExterno) segmento = 'Externo';
+
+      let origem = '—';
+      if (currentBc && group.length) origem = 'BC + Sympla';
+      else if (currentBc) origem = 'Só BC';
+      else if (group.length) origem = 'Só Sympla';
+
+      pessoas.push({
+        email: e, nome, telefone: tel, programa, estrategista,
+        segmento, tierMax, categorias: cats, origem, ingressoErrado,
+        no_bc: !!currentBc, no_sympla: group.length > 0,
+        qtd_sympla: group.length, is_chronos: programa.toLowerCase().includes('chronos'),
+        has_mansao, _shared_email: personGroups.length > 1
+      });
     });
   });
 
